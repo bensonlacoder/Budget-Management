@@ -11,6 +11,9 @@ void Budget::setRemainingDays(int days) {
     if (days < 1) {
         throw std::invalid_argument("Remaining days must be at least 1");
     }
+    if (days > 90) {
+        throw std::invalid_argument("Remaining days cannot exceed 90");
+    }
     remainingDays = days;
 }
 
