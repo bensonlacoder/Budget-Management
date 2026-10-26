@@ -4,6 +4,10 @@ A Qt Widgets walking skeleton for managing student dining points. Set a balance,
 record refills and purchases, and see daily and weekly spending recommendations.
 Values last until the app closes.
 
+This is the CSCI 187 M1 walking skeleton. See [REQUIREMENTS.md](REQUIREMENTS.md)
+for its scope and acceptance criteria, and [SPECIFICATIONS.md](SPECIFICATIONS.md)
+for its design, calculations, and validation behavior.
+
 ## Run in Qt Creator
 
 1. Open `CMakeLists.txt` or `UI/UI.pro` in Qt Creator.
@@ -46,10 +50,48 @@ compiler, choose a new build directory in all commands.
    when the field receives focus so you can type immediately.
 2. Set **Days left (including today)**. Recommendations update immediately.
 3. Enter a refill or purchase amount, then click **Add points** or **Spend points**.
-   Overspending displays an error and leaves the balance unchanged.
+4. After a successful balance action, the amount field clears and
+   **Successfully Updated** appears below the buttons. Errors appear in the same
+   place; there are no confirmation popups.
+
+The amount field accepts numbers from 0 to 1,000,000 with two decimal places.
+It has no `points` suffix. Enter a new amount before each action. A blank amount
+or a purchase larger than the balance displays an error and leaves the balance
+unchanged. Remaining days starts at 70 and can be set from 1 to 366.
 
 For example, 700 points over 70 days recommends 10 points per day and 70 per week.
 With fewer than 7 days left, the weekly recommendation equals the remaining balance.
+
+## Scope and limitations
+
+The application keeps one balance and one remaining-day count in memory. It does
+not save data, keep a transaction history, connect to a dining account, or update
+the day count automatically. Closing and reopening the app resets the balance to
+zero and remaining days to 70. Qt SQL is a build dependency inherited from the
+template; the app does not currently use a database.
+
+## Tests and continuous integration
+
+```sh
+cmake --build build
+ctest --test-dir build --output-on-failure
+```
+
+CMake discovers every `tests/*.cpp` file and builds them into `test_build`.
+`tests/test_main.cpp` supplies the doctest entry point. Add other tests as separate
+files without another `DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN` definition, and put
+your name in a comment in your contribution.
+
+`tests/Nathan_test.cpp` currently checks setting, adding to, and subtracting from
+the balance with valid amounts. Invalid inputs and budget calculations also need
+automated coverage; passing this test alone does not verify those behaviors.
+See the verification checklist in [SPECIFICATIONS.md](SPECIFICATIONS.md).
+
+`.github/workflows/ci.yml` configures, builds, and runs CTest on Ubuntu for pushes
+and pull requests. Open the repository's **Actions** tab to inspect each run.
+For the individual CI exercise, use a separate branch to push an intentionally
+failing assertion, confirm that test fails in CI, restore the assertion, and push
+again to confirm a passing run. Keep the submitted application branch passing.
 
 ## Project structure
 
@@ -59,7 +101,9 @@ With fewer than 7 days left, the weekly recommendation equals the remaining bala
 - `UI/mainui.ui`: define the layout; edit it in Qt Designer.
 - `UI/main.cpp`: launch the application for both CMake and qmake builds.
 - `tests/`: exercise the model classes with doctest; `test_main.cpp` supplies the test entry point.
-- `src/prime.*` and `tests/test_prime.cpp`: retain the course template's example model and tests.
+- `.github/workflows/ci.yml`: build and test the project in GitHub Actions.
+- `REQUIREMENTS.md`: define the walking skeleton's user-facing requirements.
+- `SPECIFICATIONS.md`: describe how the current implementation fulfills them.
 
 `MainUI` owns `Balance` and `Budget`. `Budget` references the same `Balance`, so
 purchases and refills affect the next recommendation. Declare `Balance` first so
