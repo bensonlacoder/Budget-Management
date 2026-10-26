@@ -23,8 +23,8 @@ double Budget::getDailyBudget() const {
 }
 
 double Budget::getWeeklyBudget() const {
-    if (remainingDays < 7) {
+    if (remainingDays < DAYS_PER_WEEK) {
         return balance.getBalance();
     }
-    return getDailyBudget() * 7;
+    return getDailyBudget() * DAYS_PER_WEEK;
 }
