@@ -2,8 +2,8 @@
 
 ## Functional requirements
 
-| ID | Requirement | Acceptance criterion |
-| --- | --- | --- |
+| ID | Requirement
+| --- | --- 
 | FR-01 | Show the current dining-point balance. 
 | FR-02 | Let the student set the balance.
 | FR-03 | Let the student add points. 
