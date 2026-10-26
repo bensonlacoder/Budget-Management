@@ -6,7 +6,7 @@
 
 // normal case: a typical prime number is identified correctly
 TEST_CASE("isPrime returns true for a prime number") {
-    CHECK(isPrime(7) == false);
+    CHECK(isPrime(7) == true);
 }
 
 // wrong case: a typical non-prime (composite) number is rejected
