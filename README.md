@@ -1,12 +1,14 @@
-﻿# Dining Points Budget
+﻿# Project Dining Budget
+This is the walking skeleton of Project Dining Budget, an app designed to help students
+manage their dining points responsibly and efficiently. Our goal lies in making our
+application simple and intuitive to use, while also allowing users a reasonable amount
+of freedom regarding how they plan to budget their Dining Points.
 
-A Qt Widgets walking skeleton for managing student dining points. Set a balance,
-record refills and purchases, and see daily and weekly spending recommendations.
-Values last until the app closes.
+Current features include: setting a balance, record refills and purchases, and see
+daily/weekly spending recommendations. Values last until the app closes.
 
-This is the CSCI 187 M1 walking skeleton. See [REQUIREMENTS.md](REQUIREMENTS.md)
-for its scope and acceptance criteria, and [SPECIFICATIONS.md](SPECIFICATIONS.md)
-for its design, calculations, and validation behavior.
+See [REQUIREMENTS.md](REQUIREMENTS.md) for its scope and acceptance criteria, and
+[SPECIFICATIONS.md](SPECIFICATIONS.md) for its design, calculations, and validation behavior.
 
 ## Run in Qt Creator
 
