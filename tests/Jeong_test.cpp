@@ -18,7 +18,7 @@ TEST_CASE("Balance cannot be set to a negative amount") {
     balance.setBalance(500.0);
 
     CHECK_THROWS_AS(balance.setBalance(-50.0), std::invalid_argument);
-    CHECK(balance.getBalance() == 999.0);
+    CHECK(balance.getBalance() == 500.0);
 }
 
 // negative case: remaining days cannot exceed 90
