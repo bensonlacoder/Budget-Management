@@ -5,14 +5,13 @@
 #include "balance.h"
 #include "budget.h"
 
-TEST_CASE("TEST: FR-06"){
-  
-;}
+TEST_CASE("TEST: SP-04"){
+  Balance balance;
+  balance.setBalance(700.0);
+  Budget budget(balance,70);
+  CHECK(budget.getDailyBudget() == 10.0);
+  CHECK(budget.getWeeklyBudget() == 70.0);
 
-TEST_CASE("TEST: FR-07"){
-  
-;}
-
-TEST_CASE("TEST: FR-08"){
-  
+  budget.setRemainingDays(3);
+  CHECK(budget.getWeeklyBudget() == 700.0);
 ;}
