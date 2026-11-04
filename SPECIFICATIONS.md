@@ -16,7 +16,7 @@ shown as `700.00 points`.
 
 ## SP-02: Add and spend points
 
-**Requirements:** FR-03, FR-04, FR-09
+**Requirements:** FR-03, FR-04
 
 **Add points** increases the balance by the entered amount. **Spend points**
 decreases it by the entered amount. Spending the entire balance is allowed and
@@ -28,7 +28,7 @@ each change uses the latest balance.
 
 ## SP-03: Prevent invalid balance changes
 
-**Requirements:** FR-05
+**Requirements:** FR-08
 
 The balance can never go below 0. Spending more than the balance, or using a
 negative amount, is rejected (`Balance` throws `std::invalid_argument`) and the
@@ -40,7 +40,7 @@ balance is still 725.
 
 ## SP-04: Recommend daily and weekly spending
 
-**Requirements:** FR-06, FR-07, FR-08
+**Requirements:** FR-05, FR-06, FR-07, FR-08
 
 Remaining days counts today and must be a whole number from 0 to 90, inclusive.
 Zero days means the budgeting period has ended.

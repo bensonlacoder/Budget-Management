@@ -11,3 +11,4 @@
 | FR-05 | User should be able to enter days remaining in their term. |
 | FR-06 | User should be able to see how many dining points they can spend per day. |
 | FR-07 | User should be able to see how many dining points they can spend per week. |
+| FR-08 | User should be able to see an error message when they try to spend more points than they have or enter an invalid number of days. |

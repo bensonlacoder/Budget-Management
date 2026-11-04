@@ -16,23 +16,38 @@ See [REQUIREMENTS.md](REQUIREMENTS.md) for its scope and acceptance criteria, an
 2. Select a Qt 6 desktop kit with a matching C++17 compiler.
 3. Click **Run**.
 
-## Build and test from a terminal
+## Build, test, and run from a terminal
+
+Run these commands from the repository root. Each block installs the
+dependencies (CMake, a C++17 compiler, and Qt 6), then builds the project, runs
+the tests, and launches the app.
+
+### macOS (Homebrew)
 
 ```sh
+brew install cmake qt
+cmake -S . -B build -DCMAKE_PREFIX_PATH="$(brew --prefix qt)"
+cmake --build build
+ctest --test-dir build --output-on-failure
+./build/app
+```
+
+### Ubuntu / Linux
+
+```sh
+sudo apt-get update
+sudo apt-get install -y build-essential cmake qt6-base-dev libqt6sql6-sqlite
 cmake -S . -B build
 cmake --build build
 ctest --test-dir build --output-on-failure
+./build/app
 ```
 
-Install CMake 3.16 or newer, a C++17 compiler, and Qt 6 with the Widgets and SQL
-modules. Run these commands from the repository root. The GitHub Actions workflow
-builds the application and runs the model tests on each push and pull request.
-
-Run `./build/app` on Linux or `./build/app.exe` on Windows. Add Qt's `bin` directory
-to `PATH` before launching from a terminal. If CMake cannot find Qt, add
-`-DCMAKE_PREFIX_PATH=<your-Qt-kit-directory>` to the configure command.
-
 ### Windows with the installed Qt MinGW kit
+
+First install Qt 6 with the **MinGW 64-bit** kit, **MinGW** compiler, **CMake**,
+and **Ninja** using the [Qt Online Installer](https://www.qt.io/download-qt-installer).
+Then run:
 
 ```powershell
 $env:PATH = "C:\Qt\Tools\mingw1310_64\bin;C:\Qt\6.12.0\mingw_64\bin;C:\Qt\Tools\Ninja;" + $env:PATH
@@ -59,7 +74,8 @@ compiler, choose a new build directory in all commands.
 The amount field accepts numbers from 0 to 1,000,000 with two decimal places.
 It has no `points` suffix. Enter a new amount before each action. A blank amount
 or a purchase larger than the balance displays an error and leaves the balance
-unchanged. Remaining days starts at 70 and can be set from 1 to 366.
+unchanged. Remaining days starts at 70 and can be set from 0 to 90, including
+today. Entering more than 90 shows an error and keeps the previous day count.
 
 For example, 700 points over 70 days recommends 10 points per day and 70 per week.
 With fewer than 7 days left, the weekly recommendation equals the remaining balance.
@@ -84,10 +100,11 @@ CMake discovers every `tests/*.cpp` file and builds them into `test_build`.
 files without another `DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN` definition, and put
 your name in a comment in your contribution.
 
-`tests/Nathan_test.cpp` currently checks setting, adding to, and subtracting from
-the balance with valid amounts. Invalid inputs and budget calculations also need
-automated coverage; passing this test alone does not verify those behaviors.
-See the verification checklist in [SPECIFICATIONS.md](SPECIFICATIONS.md).
+Each team member's test file in `tests/` checks one or more specifications in
+[SPECIFICATIONS.md](SPECIFICATIONS.md). `Budget_test.cpp` covers the 0–90
+remaining-day range, and `tests/ui/remaining_days_test.cpp` is a separate Qt Test
+target (`ui_tests`) that checks the app shows an error instead of crashing when
+more than 90 days are entered.
 
 `.github/workflows/ci.yml` configures, builds, and runs CTest on Ubuntu for pushes
 and pull requests. Open the repository's **Actions** tab to inspect each run.
