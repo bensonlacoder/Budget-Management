@@ -2,14 +2,13 @@
 
 ## Functional requirements
 
-| ID | Requirement
-| --- | --- 
-| FR-01 | Show the current dining-point balance. 
-| FR-02 | Let the student set the balance.
-| FR-03 | Let the student add points. 
-| FR-04 | Let the student spend points.
-| FR-05 | Prevent invalid balance changes. 
-| FR-06 | Let the student set the remaining days.
-| FR-07 | Show a daily spending recommendation.
-| FR-08 | Show a spending recommendation for the next seven days.
-| FR-09 | Make repeated amount entry simple.
+| ID | Requirement |
+| --- | --- |
+| FR-01 | User should be able to view their current dining-point balance. |
+| FR-02 | User should be able to set their dining-point balance. |
+| FR-03 | User should be able to add to their balance. |
+| FR-04 | User should be able to subtract from their balance. |
+| FR-05 | User should be able to enter days remaining in their term. |
+| FR-06 | User should be able to see how many dining points they can spend per day. |
+| FR-07 | User should be able to see how many dining points they can spend per week. |
+| FR-08 | User should be able to see an error message when they try to spend more points than they have or enter an invalid number of days. |
