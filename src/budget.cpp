@@ -8,8 +8,8 @@ Budget::Budget(const Balance &balance, int remainingDays)
 }
 
 void Budget::setRemainingDays(int days) {
-    if (days < 1) {
-        throw std::invalid_argument("Remaining days must be at least 1");
+    if (days < 0) {
+        throw std::invalid_argument("Remaining days cannot be negative");
     }
     if (days > 90) {
         throw std::invalid_argument("Remaining days cannot exceed 90");
@@ -22,6 +22,9 @@ int Budget::getRemainingDays() const {
 }
 
 double Budget::getDailyBudget() const {
+    if (remainingDays == 0) {
+        return balance.getBalance();
+    }
     return balance.getBalance() / remainingDays;
 }
 

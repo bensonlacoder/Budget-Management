@@ -2,6 +2,7 @@
 #include "ui_mainui.h"
 
 #include <QEvent>
+#include <QSignalBlocker>
 
 #include <stdexcept>
 
@@ -71,8 +72,17 @@ void MainUI::spendPoints() {
 }
 
 void MainUI::updateRemainingDays(int days) {
-    budget.setRemainingDays(days);
-    refreshDisplay();
+    try {
+        budget.setRemainingDays(days);
+        refreshDisplay();
+    } catch (const std::invalid_argument &) {
+        // Restore the last valid value without triggering another update.
+        const QSignalBlocker blocker(ui->remainingDaysSpinBox);
+        ui->remainingDaysSpinBox->setValue(budget.getRemainingDays());
+        ui->errorLabel->setText(tr(
+            "Remaining days must be between 0 and 90, including today. "
+            "Your previous day count has been kept."));
+    }
 }
 
 bool MainUI::validateAmount() {
