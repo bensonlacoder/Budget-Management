@@ -101,8 +101,10 @@ files without another `DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN` definition, and put
 your name in a comment in your contribution.
 
 Each team member's test file in `tests/` checks one or more specifications in
-[SPECIFICATIONS.md](SPECIFICATIONS.md). `Budget_test.cpp` covers the 0–90
-remaining-day range, and `tests/ui/remaining_days_test.cpp` is a separate Qt Test
+[SPECIFICATIONS.md](SPECIFICATIONS.md). Model tests are organized into
+`balance_happy_case.cpp`, `balance_edge_case.cpp`, `budget_happy_case.cpp`, and
+`budget_edge_case.cpp`. Budget edge cases cover the 0–90 remaining-day range.
+`tests/ui/remaining_days_test.cpp` is part of a separate Qt Test
 target (`ui_tests`) that checks the app shows an error instead of crashing when
 more than 90 days are entered.
 

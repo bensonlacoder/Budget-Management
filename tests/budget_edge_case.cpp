@@ -1,9 +1,27 @@
+// Budget error and edge case tests
+// Original test contributors: Jeong
+
 #include "doctest.h"
+#include "balance.h"
+#include "budget.h"
 
 #include <stdexcept>
 
-#include "balance.h"
-#include "budget.h"
+TEST_CASE("Ninety remaining days is accepted by construction and updates") {
+    Balance balance(700.0);
+    Budget budget(balance, 90);
+    CHECK(budget.getRemainingDays() == 90);
+    CHECK(budget.getDailyBudget() == doctest::Approx(700.0 / 90));
+    CHECK(budget.getWeeklyBudget() == doctest::Approx(700.0 / 90 * 7));
+
+    budget.setRemainingDays(30);
+    CHECK(budget.getDailyBudget() == doctest::Approx(700.0 / 30));
+    CHECK(budget.getWeeklyBudget() == doctest::Approx(700.0 / 30 * 7));
+    budget.setRemainingDays(90);
+    CHECK(budget.getRemainingDays() == 90);
+    CHECK(budget.getDailyBudget() == doctest::Approx(700.0 / 90));
+    CHECK(budget.getWeeklyBudget() == doctest::Approx(700.0 / 90 * 7));
+}
 
 TEST_CASE("Zero remaining days recommends the full balance without spending points") {
     Balance balance(700.0);
@@ -52,4 +70,15 @@ TEST_CASE("Negative remaining days are rejected and preserve the previous count"
     Budget budget(balance, 0);
     CHECK_THROWS_AS(budget.setRemainingDays(-1), std::invalid_argument);
     CHECK(budget.getRemainingDays() == 0);
+}
+
+TEST_CASE("Remaining days cannot exceed 90") {
+    Balance balance(500.0);
+    CHECK_THROWS_AS(Budget(balance, 91), std::invalid_argument);
+    Budget budget(balance, 30);
+
+    CHECK_THROWS_AS(budget.setRemainingDays(91),
+                    std::invalid_argument);
+
+    CHECK(budget.getRemainingDays() == 30);
 }

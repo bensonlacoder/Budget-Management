@@ -1,7 +1,7 @@
 # Dining Points Budget Specifications
 
 These are the specifications for our walking skeleton. Each one meets one or
-more requirements in [REQUIREMENTS.md](REQUIREMENTS.md) and has one test case
+more requirements in [REQUIREMENTS.md](REQUIREMENTS.md) and is covered by tests
 in `tests/`.
 
 ## SP-01: Set the balance
@@ -38,6 +38,16 @@ greater than your balance.`
 **Test case:** start at 725. `subtract(726)` and `add(-5)` both throw, and the
 balance is still 725.
 
+**Additional invalid-input cases:** `subtract(-5)` throws and preserves the
+balance. Constructing `Balance(-5)` throws. Setting an existing balance to a
+negative amount throws and preserves its previous value. Check the unchanged
+balance immediately after each rejected operation.
+
+**UI test:** set 700 points, then try to spend 701. The app shows the
+insufficient-points message and preserves the displayed balance and both
+recommendations. Spending 70 afterward succeeds, showing 630 points, 9 per day,
+and 63 for the next 7 days with the default 70 days remaining.
+
 ## SP-04: Recommend daily and weekly spending
 
 **Requirements:** FR-05, FR-06, FR-07, FR-08
@@ -63,6 +73,19 @@ Change to 3 days: next 7 days becomes 700. Values of 0, 1, and 90 days are accep
 Change to 0 days: both recommendations become 700 and the balance remains 700.
 Setting -1 or 91 days throws and leaves the previous remaining-day count unchanged.
 Use `doctest::Approx` for calculated values.
+
+**Balance-update cases:** with 700 points and 70 days, setting the balance to
+770 or adding 70 updates the recommendations to 11 per day and 77 per week.
+Independently, spending 70 from 700 updates them to 9 per day and 63 per week.
+
+**Constructor and upper-bound cases:** constructing a `Budget` with -1 or 91
+days throws. Constructing with 90 days and updating from 30 to 90 days both
+succeed and produce recommendations based on the new day count.
+
+**Balance UI cases:** verify the initial `0.00 points` display and default 70
+days. Setting, adding, and spending update the balance and recommendations with
+two decimal places. Setting replaces an existing balance; spending the entire
+balance leaves all three displayed point amounts at zero.
 
 **UI regression test:** enter 91 or 366 days. The app shows the range message,
 retains the previous day count and recommendations, and remains usable. Entering
