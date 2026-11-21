@@ -10,14 +10,16 @@ set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 
 # Retain SQL support from the course template for future persistence.
-find_package(Qt6 COMPONENTS Widgets Sql Test REQUIRED)
+find_package(Qt6 COMPONENTS Widgets Sql Test Network REQUIRED)
 
 # New model and test files are discovered automatically. UI files stay separate.
 file(GLOB APP_SOURCES  CONFIGURE_DEPENDS src/*.cpp)
 file(GLOB TEST_SOURCES CONFIGURE_DEPENDS tests/*.cpp)
 
-add_executable(app ${APP_SOURCES} UI/main.cpp UI/mainui.cpp UI/mainui.h UI/mainui.ui)
-target_link_libraries(app PRIVATE Qt6::Widgets Qt6::Sql)
+add_executable(app ${APP_SOURCES} UI/main.cpp UI/mainui.cpp UI/mainui.h UI/mainui.ui
+    UI/authdialog.cpp UI/authdialog.h UI/localaccounts.cpp UI/localaccounts.h
+    UI/friendsdialog.cpp UI/friendsdialog.h)
+target_link_libraries(app PRIVATE Qt6::Widgets Qt6::Sql Qt6::Network)
 target_include_directories(app PRIVATE src UI)
 
 # Course tests cover models; keep view and controller sources out of this target.

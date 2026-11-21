@@ -6,6 +6,8 @@
 #include "balance.h"
 #include "budget.h"
 
+#include <functional>
+
 QT_BEGIN_NAMESPACE
 namespace Ui {
 class MainUI;
@@ -17,6 +19,8 @@ class MainUI : public QMainWindow {
 
 public:
     explicit MainUI(QWidget *parent = nullptr);
+    MainUI(double startingBalance, std::function<bool(double, double)> saveBalance,
+           QWidget *parent = nullptr);
     ~MainUI() override;
 
 private:
@@ -27,7 +31,7 @@ private:
     void spendPoints();
     void updateRemainingDays(int days);
     bool validateAmount();
-    void finishBalanceUpdate();
+    void finishBalanceUpdate(double previousBalance);
     void refreshDisplay();
     static QString formatPoints(double points);
 
@@ -35,5 +39,6 @@ private:
     Balance balance;
     Budget budget;
     Ui::MainUI *ui;
+    std::function<bool(double, double)> saveBalance;
 };
 #endif // MAINUI_H

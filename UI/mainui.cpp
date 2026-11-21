@@ -5,6 +5,7 @@
 #include <QSignalBlocker>
 
 #include <stdexcept>
+#include <utility>
 
 namespace {
 constexpr int DEFAULT_REMAINING_DAYS = 70;
@@ -12,8 +13,12 @@ constexpr int POINT_DECIMAL_PLACES = 2;
 }
 
 MainUI::MainUI(QWidget *parent)
-    : QMainWindow(parent), balance(), budget(balance, DEFAULT_REMAINING_DAYS),
-      ui(new Ui::MainUI) {
+    : MainUI(0.0, {}, parent) {}
+
+MainUI::MainUI(double startingBalance, std::function<bool(double, double)> saveBalance,
+               QWidget *parent)
+    : QMainWindow(parent), balance(startingBalance), budget(balance, DEFAULT_REMAINING_DAYS),
+      ui(new Ui::MainUI), saveBalance(std::move(saveBalance)) {
     ui->setupUi(this);
     ui->amountSpinBox->installEventFilter(this);
     ui->remainingDaysSpinBox->setValue(budget.getRemainingDays());
@@ -46,16 +51,18 @@ void MainUI::setBalance() {
     if (!validateAmount()) {
         return;
     }
+    const double previous = balance.getBalance();
     balance.setBalance(ui->amountSpinBox->value());
-    finishBalanceUpdate();
+    finishBalanceUpdate(previous);
 }
 
 void MainUI::addPoints() {
     if (!validateAmount()) {
         return;
     }
+    const double previous = balance.getBalance();
     balance.add(ui->amountSpinBox->value());
-    finishBalanceUpdate();
+    finishBalanceUpdate(previous);
 }
 
 void MainUI::spendPoints() {
@@ -63,8 +70,9 @@ void MainUI::spendPoints() {
         return;
     }
     try {
+        const double previous = balance.getBalance();
         balance.subtract(ui->amountSpinBox->value());
-        finishBalanceUpdate();
+        finishBalanceUpdate(previous);
     } catch (const std::invalid_argument &) {
         ui->errorLabel->setText(
             tr("Not enough points. Enter an amount no greater than your balance."));
@@ -93,7 +101,12 @@ bool MainUI::validateAmount() {
     return true;
 }
 
-void MainUI::finishBalanceUpdate() {
+void MainUI::finishBalanceUpdate(double previousBalance) {
+    if (saveBalance && !saveBalance(previousBalance, balance.getBalance())) {
+        balance.setBalance(previousBalance);
+        ui->errorLabel->setText(tr("Could not save the balance. Try again or sign in again to reload it."));
+        return;
+    }
     refreshDisplay();
     ui->amountSpinBox->setValue(0.0);
     ui->amountSpinBox->setFocus();
