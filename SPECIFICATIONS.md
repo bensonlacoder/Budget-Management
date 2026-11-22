@@ -21,7 +21,9 @@ shown as `700.00 points`.
 **Add points** increases the balance by the entered amount. **Spend points**
 decreases it by the entered amount. Spending the entire balance is allowed and
 leaves 0. The user can make successive balance changes in the same session;
-each change uses the latest balance.
+each change uses the latest balance. The balance is kept to two decimal places,
+so any balance shown can be spent in full (for example, 0.70 + 0.10 shows 0.80
+and spending 0.80 leaves 0).
 
 **Test case:** start at 700, add 50 to get 750, spend 25 to get 725, then spend
 725 to get 0.

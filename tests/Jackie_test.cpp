@@ -14,4 +14,4 @@ TEST_CASE("TEST: SP-04"){
 
   budget.setRemainingDays(3);
   CHECK(budget.getWeeklyBudget() == 700.0);
-;}
+}

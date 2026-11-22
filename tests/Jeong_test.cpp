@@ -3,9 +3,6 @@
 
 #include "doctest.h"
 
-
-#include "doctest.h"
-
 #include <stdexcept>
 
 #include "balance.h"

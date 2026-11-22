@@ -9,17 +9,22 @@
 #include <utility>
 
 namespace {
-constexpr int DEFAULT_REMAINING_DAYS = 70;
 constexpr int POINT_DECIMAL_PLACES = 2;
 }
 
 MainUI::MainUI(QWidget *parent)
-    : MainUI(0.0, {}, parent) {}
+    : MainUI(0.0, {}, DefaultRemainingDays, {}, parent) {}
 
 MainUI::MainUI(double startingBalance, std::function<bool(double, double)> saveBalance,
-               QWidget *parent)
-    : QMainWindow(parent), balance(startingBalance), budget(balance, DEFAULT_REMAINING_DAYS),
-      ui(new Ui::MainUI), saveBalance(std::move(saveBalance)) {
+               int startingDays, std::function<bool(int)> saveRemainingDays, QWidget *parent)
+    : QMainWindow(parent), balance(startingBalance), budget(balance, DefaultRemainingDays),
+      ui(new Ui::MainUI), saveBalance(std::move(saveBalance)),
+      saveRemainingDays(std::move(saveRemainingDays)) {
+    try {
+        budget.setRemainingDays(startingDays);
+    } catch (const std::invalid_argument &) {
+        // Keep the default if a saved value is out of range.
+    }
     ui->setupUi(this);
     ui->amountSpinBox->installEventFilter(this);
     ui->remainingDaysSpinBox->setValue(budget.getRemainingDays());
@@ -95,17 +100,24 @@ void MainUI::spendPoints() {
 }
 
 void MainUI::updateRemainingDays(int days) {
+    const int previous = budget.getRemainingDays();
+    QString error;
     try {
         budget.setRemainingDays(days);
-        refreshDisplay();
+        if (!saveRemainingDays || saveRemainingDays(days)) {
+            refreshDisplay();
+            return;
+        }
+        budget.setRemainingDays(previous);
+        error = tr("Could not save the days left. Your previous day count has been kept.");
     } catch (const std::invalid_argument &) {
-        // Restore the last valid value without triggering another update.
-        const QSignalBlocker blocker(ui->remainingDaysSpinBox);
-        ui->remainingDaysSpinBox->setValue(budget.getRemainingDays());
-        ui->errorLabel->setText(tr(
-            "Remaining days must be between 0 and 90, including today. "
-            "Your previous day count has been kept."));
+        error = tr("Remaining days must be between 0 and 90, including today. "
+                   "Your previous day count has been kept.");
     }
+    // Restore the last valid value without triggering another update.
+    const QSignalBlocker blocker(ui->remainingDaysSpinBox);
+    ui->remainingDaysSpinBox->setValue(budget.getRemainingDays());
+    ui->errorLabel->setText(error);
 }
 
 bool MainUI::validateAmount() {

@@ -1,34 +1,17 @@
 #include "doctest.h"
 #include "purchasespage.h"
+#include "test_account_store.h"
 
 #include <QApplication>
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDateEdit>
-#include <QDir>
 #include <QDoubleSpinBox>
-#include <QFile>
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
-#include <QStandardPaths>
-#include <QUuid>
 
 namespace {
-// Give the real purchase store its own disposable application directory.
-struct TestAccountStore {
-    QString previous = qApp->applicationName();
-    TestAccountStore() {
-        qApp->setApplicationName("DiningMenuTest-" + QUuid::createUuid().toString(QUuid::WithoutBraces));
-    }
-    ~TestAccountStore() {
-        QDir dir(QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation));
-        QFile::remove(dir.filePath("accounts.json"));
-        QDir().rmdir(dir.absolutePath());
-        qApp->setApplicationName(previous);
-    }
-};
-
 void selectItem(QComboBox *menu, const QString &prefix) {
     const int index = menu->findText(prefix, Qt::MatchStartsWith);
     REQUIRE(index > 0);

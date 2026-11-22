@@ -24,6 +24,8 @@ constexpr int HASH_BYTES = 32;
 constexpr int HASH_ITERATIONS = 600000;
 constexpr int MIN_PASSWORD_LENGTH = 8;
 constexpr int FRIEND_ID_LENGTH = 12;
+// Wait briefly if another window of the app is writing the same file.
+constexpr int LOCK_TIMEOUT_MS = 3000;
 
 using LocalAccounts::Result;
 
@@ -66,7 +68,7 @@ Result updateAccounts(Update update) {
 
     QLockFile lock(path + ".lock");
     QJsonObject accounts;
-    if (!lock.tryLock() || !readAccounts(path, accounts)) {
+    if (!lock.tryLock(LOCK_TIMEOUT_MS) || !readAccounts(path, accounts)) {
         return Result::StorageError;
     }
 
@@ -109,8 +111,12 @@ QString newFriendId(const QJsonObject &accounts) {
 }
 
 LocalAccounts::Profile profileFrom(const QJsonObject &account) {
+    // Accounts saved before days were stored, or with an invalid value, use the default.
+    const int days = account.value("remainingDays").toInt(-1);
+    const bool validDays = days >= 0 && days <= LocalAccounts::MaxRemainingDays;
     return {account.value("displayName").toString(), account.value("friendId").toString(),
-            account.value("balance").toDouble()};
+            account.value("balance").toDouble(),
+            validDays ? days : LocalAccounts::DefaultRemainingDays};
 }
 
 QByteArray deriveHash(const QString &password, const QByteArray &salt) {
@@ -254,6 +260,22 @@ bool saveBalance(const QString &username, double previous, double next) {
             return Result::StorageError;
         }
         account.insert("balance", next);
+        accounts.insert(key, account);
+        return Result::Success;
+    }) == Result::Success;
+}
+
+bool saveRemainingDays(const QString &username, int days) {
+    if (days < 0 || days > MaxRemainingDays) {
+        return false;
+    }
+    return updateAccounts([&](QJsonObject &accounts) {
+        const QString key = accountKey(username);
+        auto account = accounts.value(key).toObject();
+        if (account.isEmpty()) {
+            return Result::StorageError;
+        }
+        account.insert("remainingDays", days);
         accounts.insert(key, account);
         return Result::Success;
     }) == Result::Success;

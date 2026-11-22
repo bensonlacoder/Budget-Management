@@ -35,8 +35,10 @@ target_include_directories(test_build PRIVATE src tests)
 enable_testing()
 add_test(NAME test_build COMMAND test_build)
 
-# Exercise day-entry validation through the real Qt widgets.
-add_executable(ui_tests tests/ui/remaining_days_test.cpp tests/ui/purchase_menu_test.cpp
+# Exercise the Qt widgets, saved accounts and menu parsing. Every tests/ui/*.cpp
+# file is included; remaining_days_test.cpp supplies main() with a QApplication.
+file(GLOB UI_TEST_SOURCES CONFIGURE_DEPENDS tests/ui/*.cpp)
+add_executable(ui_tests ${UI_TEST_SOURCES}
     ${PURCHASE_SOURCES} ${APP_SOURCES}
     UI/mainui.cpp UI/mainui.h UI/mainui.ui)
 target_link_libraries(ui_tests PRIVATE Qt6::Widgets Qt6::Test Qt6::Network)

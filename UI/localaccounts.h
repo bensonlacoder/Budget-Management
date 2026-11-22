@@ -26,10 +26,15 @@ enum class Result {
     StorageError
 };
 
+// Days left in the budgeting period, including today. Matches Budget's 0 to 90 range.
+constexpr int DefaultRemainingDays = 70;
+constexpr int MaxRemainingDays = 90;
+
 struct Profile {
     QString displayName;
     QString friendId;
     double balance = 0.0;
+    int remainingDays = DefaultRemainingDays;
 };
 
 struct DiningPlan {
@@ -70,6 +75,8 @@ Result create(const QString &username, const QString &password, const QString &d
               const QString &diningPlanId, Profile &profile);
 Result signIn(const QString &username, const QString &password, Profile &profile);
 bool saveBalance(const QString &username, double previous, double next);
+// Returns false if days is outside 0 through MaxRemainingDays or cannot be saved.
+bool saveRemainingDays(const QString &username, int days);
 Result recordPurchase(const QString &username, const Purchase &purchase, double &newBalance);
 Result removePurchase(const QString &username, const Purchase &purchase, double &newBalance);
 bool loadPurchases(const QString &username, QList<Purchase> &purchases);

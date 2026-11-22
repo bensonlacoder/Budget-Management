@@ -19,9 +19,13 @@ int main(int argc, char *argv[]) {
     QObject::connect(&auth, &QDialog::accepted, &app, [&auth] {
         const QString accountName = auth.accountName();
         const auto profile = auth.profile();
-        auto *window = new MainUI(profile.balance, [accountName](double previous, double next) {
-            return LocalAccounts::saveBalance(accountName, previous, next);
-        });
+        auto *window = new MainUI(
+            profile.balance,
+            [accountName](double previous, double next) {
+                return LocalAccounts::saveBalance(accountName, previous, next);
+            },
+            profile.remainingDays,
+            [accountName](int days) { return LocalAccounts::saveRemainingDays(accountName, days); });
         window->setAttribute(Qt::WA_DeleteOnClose);
         auto *purchases = new PurchasesPage(accountName, window);
         QObject::connect(purchases, &PurchasesPage::balanceUpdated, window, &MainUI::showSavedBalance);

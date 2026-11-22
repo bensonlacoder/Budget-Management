@@ -26,5 +26,5 @@ public:
 private:
     const Balance &balance;
     int remainingDays;
-    int DAYS_PER_WEEK = 7;
+    static constexpr int DAYS_PER_WEEK = 7;
 };

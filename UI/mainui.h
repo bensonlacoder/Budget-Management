@@ -19,8 +19,14 @@ class MainUI : public QMainWindow {
 
 public:
     explicit MainUI(QWidget *parent = nullptr);
+    static constexpr int DefaultRemainingDays = 70;
+
+    // saveBalance(previous, next) and saveRemainingDays(days) return false if the
+    // value could not be saved; the change is then undone. Either may be empty.
+    // An out-of-range startingDays falls back to DefaultRemainingDays.
     MainUI(double startingBalance, std::function<bool(double, double)> saveBalance,
-           QWidget *parent = nullptr);
+           int startingDays = DefaultRemainingDays,
+           std::function<bool(int)> saveRemainingDays = {}, QWidget *parent = nullptr);
     ~MainUI() override;
     void setPurchasePage(QWidget *page);
     void showSavedBalance(double points);
@@ -45,5 +51,6 @@ private:
     Budget budget;
     Ui::MainUI *ui;
     std::function<bool(double, double)> saveBalance;
+    std::function<bool(int)> saveRemainingDays;
 };
 #endif // MAINUI_H
