@@ -5,6 +5,7 @@
 
 #include <QDialog>
 
+class QComboBox;
 class QLabel;
 class QLineEdit;
 class QPushButton;
@@ -26,6 +27,8 @@ private:
     QLineEdit *username;
     QLabel *displayNameLabel;
     QLineEdit *displayName;
+    QLabel *diningPlanLabel;
+    QComboBox *diningPlan;
     QLineEdit *password;
     QLabel *confirmationLabel;
     QLineEdit *confirmation;

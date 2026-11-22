@@ -22,6 +22,11 @@ public:
     MainUI(double startingBalance, std::function<bool(double, double)> saveBalance,
            QWidget *parent = nullptr);
     ~MainUI() override;
+    void setPurchasePage(QWidget *page);
+    void showSavedBalance(double points);
+
+signals:
+    void balanceChanged(double points);
 
 private:
     bool eventFilter(QObject *watched, QEvent *event) override;

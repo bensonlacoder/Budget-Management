@@ -11,7 +11,10 @@ SOURCES += \
     friendsdialog.cpp \
     localaccounts.cpp \
     main.cpp \
-    mainui.cpp
+    mainui.cpp \
+    purchasespage.cpp \
+    lunchcatalog.cpp \
+    scumenu.cpp
 
 HEADERS += \
     ../src/balance.h \
@@ -19,7 +22,9 @@ HEADERS += \
     authdialog.h \
     friendsdialog.h \
     localaccounts.h \
-    mainui.h
+    mainui.h \
+    purchasespage.h \
+    scumenu.h
 
 FORMS += \
     mainui.ui

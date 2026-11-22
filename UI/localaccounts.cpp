@@ -14,6 +14,7 @@
 #include <QStandardPaths>
 #include <QUuid>
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 
@@ -131,8 +132,20 @@ bool hashesMatch(const QByteArray &expected, const QByteArray &actual) {
 }
 
 namespace LocalAccounts {
-Result create(const QString &username, const QString &password,
-              const QString &displayName, Profile &profile) {
+const QList<DiningPlan> &diningPlans() {
+    static const QList<DiningPlan> plans{
+        {"basic", "Basic Plan", 2237, false},
+        {"preferred", "Preferred Plan", 2617, false},
+        {"junior-senior", "Junior/Senior Plan", 1536, false},
+        {"apartment", "Apartment Plan", 336, false},
+        {"grad", "Graduate Plan", 336, false},
+        {"law", "Law Plan", 504, true}
+    };
+    return plans;
+}
+
+Result create(const QString &username, const QString &password, const QString &displayName,
+              const QString &diningPlanId, Profile &profile) {
     static const QRegularExpression allowedUsername(
         QRegularExpression::anchoredPattern("[A-Za-z0-9_]{3,32}"));
     const QString trimmedUsername = username.trimmed();
@@ -145,6 +158,13 @@ Result create(const QString &username, const QString &password,
     }
     if (password.size() < MIN_PASSWORD_LENGTH) {
         return Result::ShortPassword;
+    }
+    const auto &plans = diningPlans();
+    const auto plan = std::find_if(plans.cbegin(), plans.cend(), [&](const DiningPlan &option) {
+        return option.id == diningPlanId;
+    });
+    if (plan == plans.cend()) {
+        return Result::InvalidDiningPlan;
     }
 
     std::array<quint32, SALT_BYTES / sizeof(quint32)> randomWords;
@@ -164,7 +184,8 @@ Result create(const QString &username, const QString &password,
             {"hash", QString::fromLatin1(hash.toHex())},
             {"displayName", name},
             {"friendId", newFriendId(accounts)},
-            {"balance", 0.0}
+            {"diningPlan", plan->id},
+            {"balance", plan->startingPoints}
         };
         accounts.insert(key, account);
         profile = profileFrom(account);
@@ -236,6 +257,127 @@ bool saveBalance(const QString &username, double previous, double next) {
         accounts.insert(key, account);
         return Result::Success;
     }) == Result::Success;
+}
+
+Result recordPurchase(const QString &username, const Purchase &purchase, double &newBalance) {
+    const QString location = purchase.location.trimmed();
+    const QString item = purchase.item.trimmed();
+    const double amount = std::round(purchase.points * 100.0) / 100.0;
+    if (!purchase.date.isValid() || purchase.date > QDate::currentDate() ||
+        location.isEmpty() || location.size() > PurchaseTextLimit || item.size() > PurchaseTextLimit ||
+        !std::isfinite(amount) || amount <= 0.0 || amount > MaxPurchasePoints) {
+        return Result::InvalidPurchase;
+    }
+
+    double remaining = 0.0;
+    const Result result = updateAccounts([&](QJsonObject &accounts) {
+        const QString key = accountKey(username);
+        auto account = accounts.value(key).toObject();
+        const auto savedPurchases = account.value("purchases");
+        if (account.isEmpty() || (!savedPurchases.isUndefined() && !savedPurchases.isArray())) {
+            return Result::StorageError;
+        }
+
+        const double balance = std::round(account.value("balance").toDouble() * 100.0) / 100.0;
+        if (!std::isfinite(balance)) {
+            return Result::StorageError;
+        }
+        if (amount > balance) {
+            return Result::InsufficientPoints;
+        }
+        remaining = std::round((balance - amount) * 100.0) / 100.0;
+
+        auto purchases = savedPurchases.toArray();
+        purchases.prepend(QJsonObject{
+            {"id", QUuid::createUuid().toString(QUuid::WithoutBraces)},
+            {"date", purchase.date.toString(Qt::ISODate)},
+            {"location", location},
+            {"item", item},
+            {"points", amount}
+        });
+        account.insert("balance", remaining);
+        account.insert("purchases", purchases);
+        accounts.insert(key, account);
+        return Result::Success;
+    });
+    if (result == Result::Success) {
+        newBalance = remaining;
+    }
+    return result;
+}
+
+Result removePurchase(const QString &username, const Purchase &purchase, double &newBalance) {
+    double restored = 0.0;
+    const Result result = updateAccounts([&](QJsonObject &accounts) {
+        const QString key = accountKey(username);
+        auto account = accounts.value(key).toObject();
+        const auto savedPurchases = account.value("purchases");
+        if (account.isEmpty() || (!savedPurchases.isUndefined() && !savedPurchases.isArray())) {
+            return Result::StorageError;
+        }
+
+        auto purchases = savedPurchases.toArray();
+        const QString date = purchase.date.toString(Qt::ISODate);
+        const auto match = std::find_if(purchases.begin(), purchases.end(), [&](const QJsonValue &entry) {
+            const auto row = entry.toObject();
+            const QString id = row.value("id").toString();
+            if (!purchase.id.isEmpty()) {
+                return id == purchase.id;
+            }
+            // Purchases saved before IDs were introduced can still be removed.
+            return id.isEmpty() && row.value("date").toString() == date &&
+                   row.value("location").toString() == purchase.location &&
+                   row.value("item").toString() == purchase.item &&
+                   row.value("points").toDouble() == purchase.points;
+        });
+        if (match == purchases.end()) {
+            return Result::PurchaseUnavailable;
+        }
+
+        const double points = match->toObject().value("points").toDouble();
+        restored = std::round((account.value("balance").toDouble() + points) * 100.0) / 100.0;
+        if (!std::isfinite(restored) || !std::isfinite(points) || points <= 0.0 || restored < 0.0) {
+            return Result::StorageError;
+        }
+        purchases.erase(match);
+        account.insert("balance", restored);
+        account.insert("purchases", purchases);
+        accounts.insert(key, account);
+        return Result::Success;
+    });
+    if (result == Result::Success) {
+        newBalance = restored;
+    }
+    return result;
+}
+
+bool loadPurchases(const QString &username, QList<Purchase> &purchases) {
+    purchases.clear();
+    QJsonObject accounts;
+    if (!loadAccounts(accounts)) {
+        return false;
+    }
+    const auto account = accounts.value(accountKey(username)).toObject();
+    const auto savedPurchases = account.value("purchases");
+    if (account.isEmpty() || (!savedPurchases.isUndefined() && !savedPurchases.isArray())) {
+        return false;
+    }
+
+    const auto rows = savedPurchases.toArray();
+    for (const auto &entry : rows) {
+        const auto row = entry.toObject();
+        purchases.append(Purchase{
+            QDate::fromString(row.value("date").toString(), Qt::ISODate),
+            row.value("location").toString(),
+            row.value("item").toString(),
+            row.value("points").toDouble(),
+            row.value("id").toString()
+        });
+    }
+    std::stable_sort(purchases.begin(), purchases.end(), [](const Purchase &left, const Purchase &right) {
+        return left.date > right.date;
+    });
+    return true;
 }
 
 bool loadFriends(const QString &username, Friends &friends) {

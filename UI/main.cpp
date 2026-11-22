@@ -1,6 +1,7 @@
 #include "authdialog.h"
 #include "friendsdialog.h"
 #include "mainui.h"
+#include "purchasespage.h"
 
 #include <QAction>
 #include <QApplication>
@@ -22,6 +23,11 @@ int main(int argc, char *argv[]) {
             return LocalAccounts::saveBalance(accountName, previous, next);
         });
         window->setAttribute(Qt::WA_DeleteOnClose);
+        auto *purchases = new PurchasesPage(accountName, window);
+        QObject::connect(purchases, &PurchasesPage::balanceUpdated, window, &MainUI::showSavedBalance);
+        QObject::connect(window, &MainUI::balanceChanged, purchases, &PurchasesPage::showBalance);
+        purchases->showBalance(profile.balance);
+        window->setPurchasePage(purchases);
         auto *accountMenu = window->menuBar()->addMenu(QObject::tr("&Account"));
         auto *friends = accountMenu->addAction(QObject::tr("&Friends"));
         QObject::connect(friends, &QAction::triggered, window,

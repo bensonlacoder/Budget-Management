@@ -1,15 +1,18 @@
 #include "authdialog.h"
+#include <QComboBox>
 #include <QFont>
 #include <QFormLayout>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
+#include <QLocale>
 #include <QPushButton>
 #include <QVBoxLayout>
 
 AuthDialog::AuthDialog(QWidget *parent)
     : QDialog(parent), heading(new QLabel(this)), username(new QLineEdit(this)),
       displayNameLabel(new QLabel(tr("&Display name"), this)), displayName(new QLineEdit(this)),
+      diningPlanLabel(new QLabel(tr("Dining &plan"), this)), diningPlan(new QComboBox(this)),
       password(new QLineEdit(this)), confirmationLabel(new QLabel(tr("Con&firm password"), this)),
       confirmation(new QLineEdit(this)), message(new QLabel(this)),
       submitButton(new QPushButton(this)), switchButton(new QPushButton(this)) {
@@ -25,6 +28,16 @@ AuthDialog::AuthDialog(QWidget *parent)
     displayName->setObjectName("displayNameEdit");
     displayName->setPlaceholderText(tr("Visible to friends"));
     displayNameLabel->setBuddy(displayName);
+    diningPlan->setObjectName("diningPlanComboBox");
+    diningPlan->setPlaceholderText(tr("Select a dining plan"));
+    diningPlanLabel->setBuddy(diningPlan);
+    for (const auto &plan : LocalAccounts::diningPlans()) {
+        const QString points = locale().toString(plan.startingPoints);
+        const QString label = plan.perSemester
+            ? tr("%1 (%2 points per semester)").arg(plan.name, points)
+            : tr("%1 (%2 points per quarter)").arg(plan.name, points);
+        diningPlan->addItem(label, plan.id);
+    }
     password->setObjectName("passwordEdit");
     confirmation->setObjectName("confirmationEdit");
     password->setEchoMode(QLineEdit::Password);
@@ -35,6 +48,7 @@ AuthDialog::AuthDialog(QWidget *parent)
     auto *form = new QFormLayout;
     form->addRow(tr("&Username"), username);
     form->addRow(displayNameLabel, displayName);
+    form->addRow(diningPlanLabel, diningPlan);
     form->addRow(tr("&Password"), password);
     form->addRow(confirmationLabel, confirmation);
 
@@ -82,6 +96,9 @@ void AuthDialog::setCreatingAccount(bool creating) {
     displayNameLabel->setVisible(creating);
     displayName->setVisible(creating);
     displayName->clear();
+    diningPlanLabel->setVisible(creating);
+    diningPlan->setVisible(creating);
+    diningPlan->setCurrentIndex(-1);
     confirmationLabel->setVisible(creating);
     confirmation->setVisible(creating);
     password->clear();
@@ -104,7 +121,8 @@ void AuthDialog::submit() {
 
     using LocalAccounts::Result;
     const Result result = creatingAccount
-        ? LocalAccounts::create(enteredUsername, enteredPassword, displayName->text(), signedInProfile)
+        ? LocalAccounts::create(enteredUsername, enteredPassword, displayName->text(),
+                                diningPlan->currentData().toString(), signedInProfile)
         : LocalAccounts::signIn(enteredUsername, enteredPassword, signedInProfile);
 
     switch (result) {
@@ -119,6 +137,10 @@ void AuthDialog::submit() {
     case Result::InvalidDisplayName:
         message->setText(tr("Enter a display name of up to 32 characters."));
         displayName->setFocus();
+        break;
+    case Result::InvalidDiningPlan:
+        message->setText(tr("Select a dining plan to create your account."));
+        diningPlan->setFocus();
         break;
     case Result::ShortPassword:
         message->setText(tr("Choose a password with at least 8 characters."));

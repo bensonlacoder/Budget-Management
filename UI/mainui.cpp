@@ -3,6 +3,7 @@
 
 #include <QEvent>
 #include <QSignalBlocker>
+#include <QTabWidget>
 
 #include <stdexcept>
 #include <utility>
@@ -29,6 +30,20 @@ MainUI::MainUI(double startingBalance, std::function<bool(double, double)> saveB
 
 MainUI::~MainUI() {
     delete ui;
+}
+
+void MainUI::setPurchasePage(QWidget *page) {
+    auto *budgetPage = takeCentralWidget();
+    auto *pages = new QTabWidget(this);
+    pages->addTab(page, tr("&Purchases"));
+    pages->addTab(budgetPage, tr("&Budget"));
+    setCentralWidget(pages);
+    resize(750, 640);
+}
+
+void MainUI::showSavedBalance(double points) {
+    balance.setBalance(points);
+    refreshDisplay();
 }
 
 bool MainUI::eventFilter(QObject *watched, QEvent *event) {
@@ -119,6 +134,7 @@ void MainUI::refreshDisplay() {
     ui->dailyBudgetValueLabel->setText(formatPoints(budget.getDailyBudget()));
     ui->weeklyBudgetValueLabel->setText(formatPoints(budget.getWeeklyBudget()));
     ui->errorLabel->clear();
+    emit balanceChanged(balance.getBalance());
 }
 
 QString MainUI::formatPoints(double points) {
