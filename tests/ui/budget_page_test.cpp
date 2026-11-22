@@ -97,7 +97,7 @@ TEST_CASE("Balances saved from the Purchases tab refresh the Budget tab") {
     BudgetPage page(window);
     window.showSavedBalance(187.5);
     CHECK(page.balance->text() == "187.50 points");
-    CHECK(window.findChild<QLabel *>("dailyBudgetValueLabel")->text() == "2.68 points");
+    CHECK(window.findChild<QLabel *>("dailyBudgetValueLabel")->text() == "2.44 points");
 }
 
 TEST_CASE("Days left start from the saved value and each change is saved") {
@@ -124,12 +124,12 @@ TEST_CASE("Days left start from the saved value and each change is saved") {
 }
 
 TEST_CASE("Days left that cannot be saved are rolled back") {
-    MainUI window(700.0, {}, 70, [](int) { return false; });
+    MainUI window(700.0, {}, MainUI::DefaultRemainingDays, [](int) { return false; });
     auto *days = window.findChild<QSpinBox *>("remainingDaysSpinBox");
     REQUIRE(days);
     days->setValue(10);
-    CHECK(days->value() == 70);
-    CHECK(window.findChild<QLabel *>("dailyBudgetValueLabel")->text() == "10.00 points");
+    CHECK(days->value() == 77);
+    CHECK(window.findChild<QLabel *>("dailyBudgetValueLabel")->text() == "9.09 points");
     CHECK(window.findChild<QLabel *>("errorLabel")->text()
           == "Could not save the days left. Your previous day count has been kept.");
 }
@@ -137,4 +137,70 @@ TEST_CASE("Days left that cannot be saved are rolled back") {
 TEST_CASE("An out-of-range saved day count falls back to the default") {
     MainUI window(700.0, {}, 500);
     CHECK(window.findChild<QSpinBox *>("remainingDaysSpinBox")->value() == MainUI::DefaultRemainingDays);
+}
+
+TEST_CASE("New windows start with 77 days left") {
+    MainUI window;
+    CHECK(MainUI::DefaultRemainingDays == 77);
+    CHECK(window.findChild<QSpinBox *>("remainingDaysSpinBox")->value() == 77);
+}
+
+TEST_CASE("Days left count down when the date changes while the app is open") {
+    QList<int> saved;
+    MainUI window(700.0, {}, 10, [&](int days) {
+        saved.append(days);
+        return true;
+    });
+    auto *days = window.findChild<QSpinBox *>("remainingDaysSpinBox");
+    auto *daily = window.findChild<QLabel *>("dailyBudgetValueLabel");
+    const QDate today = QDate::currentDate();
+
+    window.showDate(today); // Same day: no change.
+    CHECK(days->value() == 10);
+
+    window.showDate(today.addDays(1));
+    CHECK(days->value() == 9);
+    CHECK(daily->text() == "77.78 points");
+
+    window.showDate(today.addDays(4));
+    CHECK(days->value() == 6);
+
+    window.showDate(today.addDays(2)); // A clock moved backwards never adds days.
+    CHECK(days->value() == 6);
+
+    window.showDate(today.addDays(30)); // Never drops below 0.
+    CHECK(days->value() == 0);
+    CHECK(daily->text() == "700.00 points");
+    // The saved count and its date already produce this value at sign-in.
+    CHECK(saved.isEmpty());
+}
+
+TEST_CASE("Reset days returns to the starting count and saves it") {
+    QList<int> saved;
+    MainUI window(700.0, {}, 20, [&](int days) {
+        saved.append(days);
+        return true;
+    });
+    auto *days = window.findChild<QSpinBox *>("remainingDaysSpinBox");
+    auto *reset = window.findChild<QPushButton *>("resetDaysButton");
+    auto *message = window.findChild<QLabel *>("errorLabel");
+    REQUIRE(reset);
+
+    reset->click();
+    CHECK(days->value() == 77);
+    CHECK(saved == QList<int>{77});
+    CHECK(message->text() == "Days left reset to 77.");
+
+    // Resetting when already at 77 still saves, which restarts the countdown today.
+    reset->click();
+    CHECK(saved == QList<int>{77, 77});
+}
+
+TEST_CASE("A reset that cannot be saved keeps the previous day count") {
+    MainUI window(700.0, {}, 20, [](int) { return false; });
+    auto *days = window.findChild<QSpinBox *>("remainingDaysSpinBox");
+    window.findChild<QPushButton *>("resetDaysButton")->click();
+    CHECK(days->value() == 20);
+    CHECK(window.findChild<QLabel *>("errorLabel")->text()
+          == "Could not save the days left. Your previous day count has been kept.");
 }

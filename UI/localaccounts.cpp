@@ -26,6 +26,8 @@ constexpr int MIN_PASSWORD_LENGTH = 8;
 constexpr int FRIEND_ID_LENGTH = 12;
 // Wait briefly if another window of the app is writing the same file.
 constexpr int LOCK_TIMEOUT_MS = 3000;
+// The date the saved remainingDays value was true; later days count down from it.
+constexpr auto DAYS_COUNTED_ON_KEY = "remainingDaysCountedOn";
 
 using LocalAccounts::Result;
 
@@ -110,13 +112,18 @@ QString newFriendId(const QJsonObject &accounts) {
     return id;
 }
 
+QDate daysCountedOn(const QJsonObject &account) {
+    return QDate::fromString(account.value(DAYS_COUNTED_ON_KEY).toString(), Qt::ISODate);
+}
+
 LocalAccounts::Profile profileFrom(const QJsonObject &account) {
     // Accounts saved before days were stored, or with an invalid value, use the default.
-    const int days = account.value("remainingDays").toInt(-1);
-    const bool validDays = days >= 0 && days <= LocalAccounts::MaxRemainingDays;
+    const int saved = account.value("remainingDays").toInt(-1);
+    const bool validDays = saved >= 0 && saved <= LocalAccounts::MaxRemainingDays;
+    const int days = validDays ? saved : LocalAccounts::DefaultRemainingDays;
     return {account.value("displayName").toString(), account.value("friendId").toString(),
             account.value("balance").toDouble(),
-            validDays ? days : LocalAccounts::DefaultRemainingDays};
+            LocalAccounts::remainingDaysOn(days, daysCountedOn(account), QDate::currentDate())};
 }
 
 QByteArray deriveHash(const QString &password, const QByteArray &salt) {
@@ -191,7 +198,9 @@ Result create(const QString &username, const QString &password, const QString &d
             {"displayName", name},
             {"friendId", newFriendId(accounts)},
             {"diningPlan", plan->id},
-            {"balance", plan->startingPoints}
+            {"balance", plan->startingPoints},
+            {"remainingDays", DefaultRemainingDays},
+            {DAYS_COUNTED_ON_KEY, QDate::currentDate().toString(Qt::ISODate)}
         };
         accounts.insert(key, account);
         profile = profileFrom(account);
@@ -227,11 +236,11 @@ Result signIn(const QString &username, const QString &password, Profile &profile
     }
 
     profile = profileFrom(account);
-    if (!profile.friendId.isEmpty()) {
+    if (!profile.friendId.isEmpty() && daysCountedOn(account).isValid()) {
         return Result::Success;
     }
 
-    // Older accounts contain only password credentials.
+    // Older accounts may lack a friend ID or the date their days-left count was saved.
     return updateAccounts([&](QJsonObject &current) {
         auto existing = current.value(key).toObject();
         if (existing.isEmpty()) {
@@ -241,8 +250,13 @@ Result signIn(const QString &username, const QString &password, Profile &profile
             const QString id = newFriendId(current);
             existing.insert("friendId", id);
             existing.insert("displayName", QStringLiteral("Diner %1").arg(id));
-            current.insert(key, existing);
         }
+        if (!daysCountedOn(existing).isValid()) {
+            // Start the countdown today from the count the user last saw.
+            existing.insert("remainingDays", profileFrom(existing).remainingDays);
+            existing.insert(DAYS_COUNTED_ON_KEY, QDate::currentDate().toString(Qt::ISODate));
+        }
+        current.insert(key, existing);
         profile = profileFrom(existing);
         return Result::Success;
     });
@@ -265,8 +279,17 @@ bool saveBalance(const QString &username, double previous, double next) {
     }) == Result::Success;
 }
 
-bool saveRemainingDays(const QString &username, int days) {
-    if (days < 0 || days > MaxRemainingDays) {
+int remainingDaysOn(int savedDays, const QDate &savedOn, const QDate &today) {
+    if (!savedOn.isValid() || !today.isValid()) {
+        return savedDays;
+    }
+    // A clock set backwards never adds days.
+    const qint64 passed = std::max<qint64>(0, savedOn.daysTo(today));
+    return static_cast<int>(std::max<qint64>(0, savedDays - passed));
+}
+
+bool saveRemainingDays(const QString &username, int days, const QDate &countedOn) {
+    if (days < 0 || days > MaxRemainingDays || !countedOn.isValid()) {
         return false;
     }
     return updateAccounts([&](QJsonObject &accounts) {
@@ -276,6 +299,7 @@ bool saveRemainingDays(const QString &username, int days) {
             return Result::StorageError;
         }
         account.insert("remainingDays", days);
+        account.insert(DAYS_COUNTED_ON_KEY, countedOn.toString(Qt::ISODate));
         accounts.insert(key, account);
         return Result::Success;
     }) == Result::Success;

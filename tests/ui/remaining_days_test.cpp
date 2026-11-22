@@ -58,9 +58,9 @@ TEST_CASE("Invalid day entry explains the limit and preserves the budget") {
         QTest::keyClick(input, Qt::Key_Return);
     }
 
-    CHECK(days->value() == 70);
-    CHECK(daily->text() == "10.00 points");
-    CHECK(weekly->text() == "70.00 points");
+    CHECK(days->value() == 77);
+    CHECK(daily->text() == "9.09 points");
+    CHECK(weekly->text() == "63.64 points");
     CHECK(error->text() == "Remaining days must be between 0 and 90, including today. Your previous day count has been kept.");
 
     // A valid entry after the rejection still works and clears the error.

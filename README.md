@@ -82,8 +82,9 @@ they accept, each of you can see the other's display name and balance.
 The amount field accepts numbers from 0 to 1,000,000 with two decimal places.
 It has no `points` suffix. Enter a new amount before each action. A blank amount
 or a purchase larger than the balance displays an error and leaves the balance
-unchanged. Balances are kept to two decimal places. Remaining days starts at 70 for a new account and
-can be set from 0 to 90; larger values are rejected and the previous count is kept.
+unchanged. Balances are kept to two decimal places. Remaining days starts at 77 for a new account, goes down by one each day (including
+while the app is open), and can be set from 0 to 90; larger values are rejected and
+the previous count is kept. **Reset days** sets it back to 77.
 
 For example, 700 points over 70 days recommends 10 points per day and 70 per week.
 With fewer than 7 days left, the weekly recommendation equals the remaining balance.
@@ -93,9 +94,9 @@ With fewer than 7 days left, the weekly recommendation equals the remaining bala
 Accounts are stored in `accounts.json` in the app's local data folder (on Windows,
 `%LOCALAPPDATA%\DiningPointsBudget`). Passwords are stored as salted PBKDF2 hashes.
 Accounts and friends exist only on that computer. Each account's days-left count is
-saved when you change it and restored when you sign in (new accounts start at 70).
-The app does not connect to a real dining account or count the days down
-automatically. Built-in menu prices are a dated reference (see
+saved with the date you set it, and at sign-in it is reduced by the days that have
+passed since then (new accounts start at 77). The app does not connect to a real
+dining account. Built-in menu prices are a dated reference (see
 [docs/dining-menu.md](docs/dining-menu.md)). Qt SQL is a build dependency inherited
 from the template; the app does not use a database.
 

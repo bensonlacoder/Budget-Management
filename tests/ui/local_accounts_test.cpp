@@ -189,3 +189,32 @@ TEST_CASE("Days left are saved per account and restored at sign-in") {
     REQUIRE(LocalAccounts::signIn("planner", "correct-horse", signedIn) == Result::Success);
     CHECK(signedIn.remainingDays == 0);
 }
+
+TEST_CASE("Days left count down by one for each day since they were saved") {
+    const QDate monday(2026, 11, 16);
+    CHECK(LocalAccounts::remainingDaysOn(77, monday, monday) == 77);
+    CHECK(LocalAccounts::remainingDaysOn(77, monday, monday.addDays(1)) == 76);
+    CHECK(LocalAccounts::remainingDaysOn(77, monday, monday.addDays(77)) == 0);
+    CHECK(LocalAccounts::remainingDaysOn(77, monday, monday.addDays(200)) == 0);
+    // A clock set backwards, or a missing date, never changes the count.
+    CHECK(LocalAccounts::remainingDaysOn(77, monday, monday.addDays(-3)) == 77);
+    CHECK(LocalAccounts::remainingDaysOn(77, QDate(), monday) == 77);
+}
+
+TEST_CASE("Signing in on a later day shows fewer days left") {
+    TestAccountStore store;
+    const auto created = createAccount("counter", "Counter");
+    CHECK(created.remainingDays == 77);
+
+    const QDate today = QDate::currentDate();
+    LocalAccounts::Profile signedIn;
+    REQUIRE(LocalAccounts::saveRemainingDays("counter", 30, today.addDays(-5)));
+    REQUIRE(LocalAccounts::signIn("counter", "correct-horse", signedIn) == Result::Success);
+    CHECK(signedIn.remainingDays == 25);
+
+    REQUIRE(LocalAccounts::saveRemainingDays("counter", 30, today.addDays(-45)));
+    REQUIRE(LocalAccounts::signIn("counter", "correct-horse", signedIn) == Result::Success);
+    CHECK(signedIn.remainingDays == 0);
+
+    CHECK_FALSE(LocalAccounts::saveRemainingDays("counter", 30, QDate()));
+}

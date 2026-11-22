@@ -46,7 +46,8 @@ balance is still 725.
 
 Remaining days counts today and must be a whole number from 0 to 90, inclusive.
 Zero days means the budgeting period has ended.
-The app starts with 70 remaining days. Typed day counts are validated when the
+The app starts with 77 remaining days. The count goes down by one each day, including
+while the app is open, and never below 0. **Reset days** sets it back to 77 and saves it. Typed day counts are validated when the
 user presses Enter or leaves the field; arrow adjustments are validated immediately.
 If the user enters more than 90 days, the app restores the previous day count,
 keeps the existing recommendations, and displays `Remaining days must be between

@@ -4,12 +4,15 @@
 #include <QEvent>
 #include <QSignalBlocker>
 #include <QTabWidget>
+#include <QTimer>
 
+#include <algorithm>
 #include <stdexcept>
 #include <utility>
 
 namespace {
 constexpr int POINT_DECIMAL_PLACES = 2;
+constexpr int DATE_CHECK_INTERVAL_MS = 60 * 1000;
 }
 
 MainUI::MainUI(QWidget *parent)
@@ -19,7 +22,7 @@ MainUI::MainUI(double startingBalance, std::function<bool(double, double)> saveB
                int startingDays, std::function<bool(int)> saveRemainingDays, QWidget *parent)
     : QMainWindow(parent), balance(startingBalance), budget(balance, DefaultRemainingDays),
       ui(new Ui::MainUI), saveBalance(std::move(saveBalance)),
-      saveRemainingDays(std::move(saveRemainingDays)) {
+      saveRemainingDays(std::move(saveRemainingDays)), shownDate(QDate::currentDate()) {
     try {
         budget.setRemainingDays(startingDays);
     } catch (const std::invalid_argument &) {
@@ -31,6 +34,10 @@ MainUI::MainUI(double startingBalance, std::function<bool(double, double)> saveB
 
     connectControls();
     refreshDisplay();
+
+    auto *clock = new QTimer(this);
+    connect(clock, &QTimer::timeout, this, [this] { showDate(QDate::currentDate()); });
+    clock->start(DATE_CHECK_INTERVAL_MS);
 }
 
 MainUI::~MainUI() {
@@ -51,6 +58,21 @@ void MainUI::showSavedBalance(double points) {
     refreshDisplay();
 }
 
+void MainUI::showDate(const QDate &today) {
+    if (!today.isValid() || !shownDate.isValid() || today <= shownDate) {
+        return;
+    }
+    const qint64 passed = shownDate.daysTo(today);
+    shownDate = today;
+    const int days = static_cast<int>(std::max<qint64>(0, budget.getRemainingDays() - passed));
+    // The saved count and its date already give this value at the next sign-in,
+    // so nothing needs to be saved here.
+    budget.setRemainingDays(days);
+    const QSignalBlocker blocker(ui->remainingDaysSpinBox);
+    ui->remainingDaysSpinBox->setValue(days);
+    refreshDisplay();
+}
+
 bool MainUI::eventFilter(QObject *watched, QEvent *event) {
     if (watched == ui->amountSpinBox && event->type() == QEvent::FocusIn
         && ui->amountSpinBox->value() == 0.0) {
@@ -65,6 +87,7 @@ void MainUI::connectControls() {
     connect(ui->spendPointsButton, &QPushButton::clicked, this, &MainUI::spendPoints);
     connect(ui->remainingDaysSpinBox, &QSpinBox::valueChanged,
             this, &MainUI::updateRemainingDays);
+    connect(ui->resetDaysButton, &QPushButton::clicked, this, &MainUI::resetRemainingDays);
 }
 
 void MainUI::setBalance() {
@@ -99,14 +122,14 @@ void MainUI::spendPoints() {
     }
 }
 
-void MainUI::updateRemainingDays(int days) {
+bool MainUI::updateRemainingDays(int days) {
     const int previous = budget.getRemainingDays();
     QString error;
     try {
         budget.setRemainingDays(days);
         if (!saveRemainingDays || saveRemainingDays(days)) {
             refreshDisplay();
-            return;
+            return true;
         }
         budget.setRemainingDays(previous);
         error = tr("Could not save the days left. Your previous day count has been kept.");
@@ -118,6 +141,18 @@ void MainUI::updateRemainingDays(int days) {
     const QSignalBlocker blocker(ui->remainingDaysSpinBox);
     ui->remainingDaysSpinBox->setValue(budget.getRemainingDays());
     ui->errorLabel->setText(error);
+    return false;
+}
+
+void MainUI::resetRemainingDays() {
+    {
+        // Update once below, even when the box already shows the starting count.
+        const QSignalBlocker blocker(ui->remainingDaysSpinBox);
+        ui->remainingDaysSpinBox->setValue(DefaultRemainingDays);
+    }
+    if (updateRemainingDays(DefaultRemainingDays)) {
+        ui->errorLabel->setText(tr("Days left reset to %1.").arg(DefaultRemainingDays));
+    }
 }
 
 bool MainUI::validateAmount() {
