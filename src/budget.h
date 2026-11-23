@@ -15,11 +15,13 @@ public:
 
     int getRemainingDays() const;
 
-    // Recommended maximum spending per day: balance / remaining days.
+    // Recommended maximum spending per day: balance / remaining days, rounded down
+    // to the nearest hundredth so the advice never adds up to more than the balance.
     // Returns the full balance when no days remain.
     double getDailyBudget() const;
 
-    // Recommended maximum spending per week: daily budget * 7, capped at balance.
+    // Recommended maximum spending per week: balance * 7 / remaining days, rounded down
+    // to the nearest hundredth.
     // Returns the full balance when fewer than 7 days remain, including 0.
     double getWeeklyBudget() const;
 

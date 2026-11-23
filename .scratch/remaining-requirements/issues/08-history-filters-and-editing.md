@@ -1,17 +1,20 @@
-# 08: Filter purchase history and edit purchases
+# 08: Filter history and edit purchases
 
-**Requirements:** FR-10 (filtering), FR-33 (correcting purchases)
+**Owner:** P3
 
-**What to build:** The user can filter purchase history by a date range and by dining location, and can edit a manually entered purchase. The balance and budget advice update after an edit.
+**Requirements:** FR-10 (filtering), FR-11, FR-33 (correcting purchases)
 
-**Blocked by:** None (can start immediately)
+**Files:** `UI/purchasespage.*`, `tests/ui/purchase_history_test.cpp`
+
+**What to build:** The history on the Purchases tab can be filtered by date range and location. It also shows balance corrections, and a purchase can be edited, with the balance updating to match.
+
+**Blocked by:** 01 (SQLite storage), but the UI can be built against the stubs from 00
 
 **Status:** ready-for-agent
 
-- [ ] Date-range and location filters above the history narrow the list, and they can be cleared
-- [ ] A message is shown when no purchases match the filters
-- [ ] Selecting a purchase and choosing Edit lets the user change its date, location, item, and points
-- [ ] Editing the points changes the balance by the difference, and an edit that would make the balance negative is rejected with the purchase left unchanged
-- [ ] The balance and budget advice refresh after an edit
-- [ ] Edits are still there after signing out and back in (FR-23)
+- [ ] Date-range and location filters narrow the history and can be cleared; a message appears when nothing matches
+- [ ] Balance corrections from the Profile page appear in history, labelled "Balance correction" and visually different from purchases
+- [ ] Edit changes a purchase's date, location, item, or points; the balance changes by the difference
+- [ ] An edit that would make the balance negative is rejected, and the purchase stays unchanged
+- [ ] Purchase dates are limited to the current quarter (from 03)
 - [ ] Tests cover each filter, the filters combined, a successful edit, and a rejected edit

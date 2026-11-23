@@ -97,7 +97,7 @@ TEST_CASE("Balances saved from the Purchases tab refresh the Budget tab") {
     BudgetPage page(window);
     window.showSavedBalance(187.5);
     CHECK(page.balance->text() == "187.50 points");
-    CHECK(window.findChild<QLabel *>("dailyBudgetValueLabel")->text() == "2.44 points");
+    CHECK(window.findChild<QLabel *>("dailyBudgetValueLabel")->text() == "2.43 points");
 }
 
 TEST_CASE("Days left start from the saved value and each change is saved") {
@@ -160,7 +160,7 @@ TEST_CASE("Days left count down when the date changes while the app is open") {
 
     window.showDate(today.addDays(1));
     CHECK(days->value() == 9);
-    CHECK(daily->text() == "77.78 points");
+    CHECK(daily->text() == "77.77 points");
 
     window.showDate(today.addDays(4));
     CHECK(days->value() == 6);

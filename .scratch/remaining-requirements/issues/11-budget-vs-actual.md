@@ -1,14 +1,18 @@
 # 11: Actual spending vs. budget
 
+**Owner:** P3
+
 **Requirements:** FR-14
 
-**What to build:** For each day and week, the user can see actual spending next to the budgeted amount for that period and how far over or under budget they are.
+**Files:** `UI/chartspage.*`, `tests/ui/charts_page_test.cpp`
 
-**Blocked by:** 10 (Spending by location and spending charts)
+**What to build:** For each day and week, the Charts tab shows actual spending next to the budget for that period, and how far over or under budget the user was.
+
+**Blocked by:** 10 (Location totals and charts), 06 (Plan tab and reserve goal; uses `Budget` without changing it)
 
 **Status:** ready-for-agent
 
-- [ ] Daily and weekly views show actual spending, the budget, and the difference, labelled as over or under
-- [ ] Charts from 10 show the budget as a reference line or bar
-- [ ] The team writes down which budget a past period is compared against (for example, the advice that applied at the time, or today's advice) in SPECIFICATIONS.md
-- [ ] Unit tests cover over-budget, under-budget, and exactly-on-budget periods
+- [ ] Daily and weekly views show actual spending, the budget, and the difference, labelled over or under
+- [ ] Charts show the budget as a reference line
+- [ ] SPECIFICATIONS.md says which budget a past period is compared against
+- [ ] Unit tests cover periods that are over, under, and exactly on budget

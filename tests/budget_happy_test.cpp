@@ -22,7 +22,7 @@ TEST_CASE("Budget can be initialized with a valid balance and remaining days") {
     Balance balance(500.0);
     Budget budget(balance, 30);
     CHECK(budget.getRemainingDays() == 30);
-    CHECK(budget.getDailyBudget() == doctest::Approx(500.0 / 30));
+    CHECK(budget.getDailyBudget() == doctest::Approx(16.66)); // 16.666... rounded down
 }
 
 TEST_CASE("Recommendations follow balance changes made after the budget is created") {

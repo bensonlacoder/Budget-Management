@@ -236,6 +236,10 @@ Result signIn(const QString &username, const QString &password, Profile &profile
     }
 
     profile = profileFrom(account);
+    // A hand-edited or damaged balance would make Balance throw when the window opens.
+    if (!std::isfinite(profile.balance) || profile.balance < 0.0) {
+        return Result::StorageError;
+    }
     if (!profile.friendId.isEmpty() && daysCountedOn(account).isValid()) {
         return Result::Success;
     }

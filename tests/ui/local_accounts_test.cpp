@@ -4,6 +4,12 @@
 #include "localaccounts.h"
 #include "test_account_store.h"
 
+#include <QDir>
+#include <QFile>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QStandardPaths>
+
 using LocalAccounts::Result;
 
 namespace {
@@ -217,4 +223,24 @@ TEST_CASE("Signing in on a later day shows fewer days left") {
     CHECK(signedIn.remainingDays == 0);
 
     CHECK_FALSE(LocalAccounts::saveRemainingDays("counter", 30, QDate()));
+}
+
+TEST_CASE("A damaged saved balance is reported instead of crashing sign-in") {
+    TestAccountStore store;
+    createAccount("damaged", "Damaged");
+    const QString path = QDir(QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation))
+                             .filePath("accounts.json");
+    QFile file(path);
+    REQUIRE(file.open(QIODevice::ReadOnly));
+    QJsonObject accounts = QJsonDocument::fromJson(file.readAll()).object();
+    file.close();
+    QJsonObject account = accounts.value("damaged").toObject();
+    account.insert("balance", -5.0);
+    accounts.insert("damaged", account);
+    REQUIRE(file.open(QIODevice::WriteOnly | QIODevice::Truncate));
+    file.write(QJsonDocument(accounts).toJson());
+    file.close();
+
+    LocalAccounts::Profile profile;
+    CHECK(LocalAccounts::signIn("damaged", "correct-horse", profile) == Result::StorageError);
 }

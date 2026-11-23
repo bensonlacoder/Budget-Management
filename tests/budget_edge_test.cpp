@@ -3,6 +3,7 @@
 
 #include "doctest.h"
 
+#include <cmath>
 #include <stdexcept>
 
 #include "balance.h"
@@ -17,7 +18,7 @@ TEST_CASE("SP-04: 0, 1 and 90 remaining days are accepted") {
         CHECK_NOTHROW(budget.setRemainingDays(days));
         CHECK(budget.getRemainingDays() == days);
     }
-    CHECK(budget.getDailyBudget() == doctest::Approx(700.0 / 90));
+    CHECK(budget.getDailyBudget() == doctest::Approx(7.77)); // 7.777... rounded down
 }
 
 TEST_CASE("Zero remaining days recommends the full balance without spending points") {
@@ -50,7 +51,7 @@ TEST_CASE("Weekly budget uses the full balance for fewer than seven remaining da
         budget.setRemainingDays(days);
         CHECK(budget.getWeeklyBudget() == 700.0);
         if (days > 0) {
-            CHECK(budget.getDailyBudget() == doctest::Approx(700.0 / days));
+            CHECK(budget.getDailyBudget() == doctest::Approx(std::floor(70000.0 / days) / 100.0));
         }
     }
     budget.setRemainingDays(7);
@@ -76,4 +77,21 @@ TEST_CASE("Remaining days cannot exceed 90") {
 
     CHECK_THROWS_AS(budget.setRemainingDays(91), std::invalid_argument);
     CHECK(budget.getRemainingDays() == 30);
+}
+
+TEST_CASE("Recommendations round down so following them never overspends") {
+    Balance balance(700.0);
+    Budget budget(balance, 77);
+    CHECK(budget.getDailyBudget() == doctest::Approx(9.09));   // 9.0909...
+    CHECK(budget.getWeeklyBudget() == doctest::Approx(63.63)); // 63.636...
+    CHECK(budget.getDailyBudget() * 77 <= balance.getBalance());
+
+    // 0.29 is stored as 0.28999... and must still give 0.29, not 0.28.
+    balance.setBalance(0.29);
+    budget.setRemainingDays(1);
+    CHECK(budget.getDailyBudget() == doctest::Approx(0.29));
+    balance.setBalance(2.03);
+    budget.setRemainingDays(7);
+    CHECK(budget.getDailyBudget() == doctest::Approx(0.29));
+    CHECK(budget.getWeeklyBudget() == doctest::Approx(2.03));
 }

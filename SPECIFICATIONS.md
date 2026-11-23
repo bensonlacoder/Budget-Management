@@ -30,7 +30,7 @@ and spending 0.80 leaves 0).
 
 ## SP-03: Prevent invalid balance changes
 
-**Requirements:** FR-05
+**Requirements:** FR-08
 
 The balance can never go below 0. Spending more than the balance, or using a
 negative amount, is rejected (`Balance` throws `std::invalid_argument`) and the
@@ -42,7 +42,7 @@ balance is still 725.
 
 ## SP-04: Recommend daily and weekly spending
 
-**Requirements:** FR-06, FR-07, FR-08
+**Requirements:** FR-05, FR-06, FR-07, FR-08
 
 Remaining days counts today and must be a whole number from 0 to 90, inclusive.
 Zero days means the budgeting period has ended.
@@ -57,8 +57,10 @@ this range throws `std::invalid_argument`. A rejected update leaves the previous
 remaining-day count unchanged.
 
 - With 0 days remaining, both recommendations equal the current balance; the balance is unchanged.
-- With at least 1 day remaining, per day = current balance / remaining days.
-- Next 7 days = per day x 7, or the whole balance if fewer than 7 days remain, including 0.
+- With at least 1 day remaining, per day = current balance / remaining days, rounded down to the
+  nearest hundredth so following the advice never spends more than the balance.
+- Next 7 days = current balance x 7 / remaining days, rounded down the same way, or the whole
+  balance if fewer than 7 days remain, including 0.
 - Recommendations use the latest balance and update when the balance or days change.
 
 **Test case:** with 700 points and 70 days, per day is 10 and next 7 days is 70.

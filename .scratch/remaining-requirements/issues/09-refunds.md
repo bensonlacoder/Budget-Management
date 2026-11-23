@@ -1,18 +1,20 @@
 # 09: Refunds
 
-**Requirements:** FR-32, FR-10 (refund history), FR-33 (correcting refunds)
+**Owner:** P3
 
-**What to build:** The user can record a full or partial refund, linked to the original purchase when there is one. The refunded points go back into the balance and are taken off spending totals. Refunds appear in the history and can be edited or removed.
+**Requirements:** FR-10 (refund history), FR-32, FR-33 (correcting refunds)
 
-**Blocked by:** 08 (Filter purchase history and edit purchases)
+**Files:** `UI/purchasespage.*`, `tests/ui/purchase_history_test.cpp`
+
+**What to build:** The user records a full or partial refund, linked to the original purchase when there is one. The points return to the balance, and the refund appears in history, where it can be edited or removed.
+
+**Blocked by:** 08 (Filter history and edit purchases)
 
 **Status:** ready-for-agent
 
 - [ ] The user can record a refund from a selected purchase, which links it automatically, or on its own
-- [ ] A refund linked to a purchase cannot be larger than what is left unrefunded on that purchase
-- [ ] The balance goes up by the refund amount
-- [ ] Refunds appear in the history, are visually different from purchases, and work with the filters from 08
+- [ ] A linked refund can't be larger than the part of the purchase that hasn't been refunded yet
+- [ ] Refunds raise the balance, appear in history, and work with the filters
 - [ ] Refunds can be edited or removed, and the balance updates to match
-- [ ] Removing a purchase that has refunds either removes or unlinks them; the team writes the rule in SPECIFICATIONS.md
-- [ ] Refunds are still there after signing out and back in (FR-23)
-- [ ] Tests cover full refunds, partial refunds, over-refunding being rejected, and editing and removing refunds
+- [ ] Removing a purchase that has refunds follows a rule written in SPECIFICATIONS.md
+- [ ] Tests cover full refunds, partial refunds, a rejected over-refund, editing, and removing

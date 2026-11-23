@@ -91,6 +91,10 @@ With fewer than 7 days left, the weekly recommendation equals the remaining bala
 
 ## Scope and limitations
 
+> **Planned storage change:** account storage is moving from `accounts.json` to a local
+> SQLite database with sign-in by email (ticket T01). Accounts saved in `accounts.json`
+> will **not** be carried over; everyone creates a new account after that change.
+
 Accounts are stored in `accounts.json` in the app's local data folder (on Windows,
 `%LOCALAPPDATA%\DiningPointsBudget`). Passwords are stored as salted PBKDF2 hashes.
 Accounts and friends exist only on that computer. Each account's days-left count is
