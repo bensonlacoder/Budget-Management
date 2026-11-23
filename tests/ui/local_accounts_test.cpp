@@ -499,6 +499,127 @@ TEST_CASE("Removing a refund whose points were already spent is refused") {
     CHECK(balanceOf(buyer) == 0.0);
 }
 
+// ---- Last updated (T12) ----
+
+namespace {
+// Sets the saved last-updated time to an old value, so a test can tell whether the
+// next operation changed it.
+void markOld(const QString &account) {
+    const QString sql = QStringLiteral("UPDATE accounts SET last_updated = '2000-01-01T00:00:00.000Z'"
+                                       " WHERE id = '%1'").arg(account);
+    const QByteArray utf8 = sql.toUtf8();
+    tamper({utf8.constData()});
+}
+
+bool wasUpdated(const QString &account) {
+    QDateTime updated;
+    REQUIRE(LocalAccounts::loadLastUpdated(account, updated));
+    REQUIRE(updated.isValid());
+    return updated.date().year() > 2000;
+}
+}
+
+TEST_CASE("Last updated starts empty and records successful changes in local time") {
+    TestAccountStore store;
+    const auto account = createAccount("time@scu.edu", "Timer").accountId;
+    QDateTime updated = QDateTime::currentDateTime();
+    REQUIRE(LocalAccounts::loadLastUpdated(account, updated));
+    CHECK_FALSE(updated.isValid()); // Nothing has changed yet.
+    CHECK_FALSE(LocalAccounts::loadLastUpdated("nobody", updated));
+
+    // Saved with millisecond precision, so compare against times truncated to the second.
+    const QDateTime before = QDateTime::currentDateTime().addSecs(-1);
+    double balance = 0.0;
+    REQUIRE(LocalAccounts::recordPurchase(account, {QDate::currentDate(), "Marketplace", "", 1.0},
+                                          balance) == Result::Success);
+    const QDateTime after = QDateTime::currentDateTime().addSecs(1);
+    REQUIRE(LocalAccounts::loadLastUpdated(account, updated));
+    CHECK(updated >= before);
+    CHECK(updated <= after);
+    CHECK(updated.timeSpec() == Qt::LocalTime);
+
+    LocalAccounts::Profile profile;
+    REQUIRE(LocalAccounts::loadProfile(account, profile));
+    CHECK(profile.lastUpdated == updated);
+}
+
+TEST_CASE("Every successful balance or history change updates the time") {
+    TestAccountStore store;
+    const auto account = createAccount("every@scu.edu", "Everyone").accountId; // 2237
+    const QDate today = QDate::currentDate();
+    double balance = 0.0;
+    REQUIRE(LocalAccounts::recordPurchase(account, {today, "Marketplace", "Lunch", 10.0}, balance)
+            == Result::Success);
+    QList<LocalAccounts::Purchase> purchases;
+    REQUIRE(LocalAccounts::loadPurchases(account, purchases));
+    auto purchase = purchases.first();
+
+    SUBCASE("Recording a purchase") {
+        markOld(account);
+        REQUIRE(LocalAccounts::recordPurchase(account, {today, "Marketplace", "", 1.0}, balance)
+                == Result::Success);
+    }
+    SUBCASE("Editing a purchase, even without changing its points") {
+        purchase.location = "The Bronco";
+        markOld(account);
+        REQUIRE(LocalAccounts::editPurchase(account, purchase, balance) == Result::Success);
+    }
+    SUBCASE("Removing a purchase") {
+        markOld(account);
+        REQUIRE(LocalAccounts::removePurchase(account, purchase, balance) == Result::Success);
+    }
+    SUBCASE("Recording, editing and removing a refund") {
+        markOld(account);
+        REQUIRE(LocalAccounts::recordRefund(account, {today, 4.0, purchase.id}, balance)
+                == Result::Success);
+        CHECK(wasUpdated(account));
+        QList<HistoryEntry> history;
+        REQUIRE(LocalAccounts::loadHistory(account, history));
+        const QString refundId = history.first().id;
+        markOld(account);
+        REQUIRE(LocalAccounts::editRefund(account, {today, 5.0, purchase.id, {}, refundId}, balance)
+                == Result::Success);
+        CHECK(wasUpdated(account));
+        markOld(account);
+        REQUIRE(LocalAccounts::removeRefund(account, refundId, balance) == Result::Success);
+    }
+    SUBCASE("Correcting the balance") {
+        markOld(account);
+        REQUIRE(LocalAccounts::correctBalance(account, CorrectionMode::Add, 5.0, balance)
+                == Result::Success);
+    }
+    SUBCASE("Saving a balance from the Budget tab") {
+        markOld(account);
+        REQUIRE(LocalAccounts::saveBalance(account, 2227.0, 2000.0));
+    }
+    CHECK(wasUpdated(account));
+}
+
+TEST_CASE("Rejected or empty changes leave the time unchanged") {
+    TestAccountStore store;
+    const auto account = createAccount("still@scu.edu", "Still", "apartment").accountId; // 336
+    const QDate today = QDate::currentDate();
+    double balance = 0.0;
+    markOld(account);
+
+    CHECK(LocalAccounts::recordPurchase(account, {today, "Marketplace", "", 400.0}, balance)
+          == Result::InsufficientPoints);
+    CHECK(LocalAccounts::recordPurchase(account, {today, "", "", 1.0}, balance)
+          == Result::InvalidPurchase);
+    CHECK(LocalAccounts::correctBalance(account, CorrectionMode::Subtract, 400.0, balance)
+          == Result::InsufficientPoints);
+    // Setting the balance to its current value isn't a change.
+    CHECK(LocalAccounts::correctBalance(account, CorrectionMode::Set, 336.0, balance)
+          == Result::Success);
+    CHECK(LocalAccounts::recordRefund(account, {today, 1.0, "no-such-purchase"}, balance)
+          == Result::PurchaseUnavailable);
+    CHECK_FALSE(LocalAccounts::saveBalance(account, 1.0, 2.0)); // Stale previous balance.
+    // Settings and days corrections aren't balance or history changes.
+    CHECK(LocalAccounts::savePlanSettings(account, {}) == Result::Success);
+    CHECK(LocalAccounts::saveRemainingDays(account, 30));
+    CHECK_FALSE(wasUpdated(account));
+}
+
 // ---- Plan tab ----
 
 TEST_CASE("Plan settings are saved together and invalid values are refused") {
@@ -632,12 +753,9 @@ TEST_CASE("Menu sections can be saved once, listed and removed") {
 
 // ---- Not implemented yet ----
 
-TEST_CASE("T12 and T15 functions fail safely until those tickets implement them") {
+TEST_CASE("T15 functions fail safely until that ticket implements them") {
     TestAccountStore store;
-    const auto account = createAccount("later@scu.edu", "Later").accountId;
-    QDateTime updated = QDateTime::currentDateTime();
-    CHECK_FALSE(LocalAccounts::loadLastUpdated(account, updated));
-    CHECK_FALSE(updated.isValid());
+    createAccount("later@scu.edu", "Later");
     CHECK(LocalAccounts::sendVerificationCode("later@scu.edu") == Result::StorageError);
     CHECK(LocalAccounts::resetPassword("later@scu.edu", "123456", "new-password")
           == Result::StorageError);

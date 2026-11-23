@@ -271,6 +271,13 @@ constexpr auto PROFILE_COLUMNS =
     "id, email, display_name, friend_id, dining_plan, balance_cents, remaining_days,"
     " days_counted_on, days_corrected, last_updated";
 
+// Last-updated times are saved in UTC (ISO 8601 with milliseconds) and returned in
+// local time. Returns an invalid QDateTime for a missing or empty value.
+QDateTime lastUpdatedFrom(const QVariant &value) {
+    const QDateTime saved = QDateTime::fromString(value.toString(), Qt::ISODateWithMs);
+    return saved.isValid() ? saved.toLocalTime() : QDateTime();
+}
+
 // Reads a row selected with PROFILE_COLUMNS.
 LocalAccounts::Profile profileFrom(const QSqlQuery &row) {
     LocalAccounts::Profile profile;
@@ -284,7 +291,7 @@ LocalAccounts::Profile profileFrom(const QSqlQuery &row) {
         row.value(6).toInt(), QDate::fromString(row.value(7).toString(), Qt::ISODate),
         QDate::currentDate());
     profile.daysCorrected = row.value(8).toBool();
-    profile.lastUpdated = QDateTime::fromString(row.value(9).toString(), Qt::ISODateWithMs);
+    profile.lastUpdated = lastUpdatedFrom(row.value(9));
     return profile;
 }
 
@@ -310,10 +317,14 @@ bool balanceOf(QSqlDatabase &db, const QString &account, qint64 &cents) {
     return true;
 }
 
+// Saves the balance and records now as the last-updated time (T12). Every successful
+// change to the balance or history ends here, including edits that leave the amount
+// the same; a failed change rolls back with its transaction, timestamp included.
 bool setBalance(QSqlDatabase &db, const QString &account, qint64 cents) {
     QSqlQuery query(db);
-    return run(query, QStringLiteral("UPDATE accounts SET balance_cents = ? WHERE id = ?"),
-               {cents, account});
+    return run(query, QStringLiteral("UPDATE accounts SET balance_cents = ?, last_updated = ?"
+                                     " WHERE id = ?"),
+               {cents, QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs), account});
 }
 
 // Adds `change` cents to the balance. Returns InsufficientPoints if it would go negative.
@@ -966,9 +977,17 @@ bool loadHistory(const QString &account, QList<HistoryEntry> &history) {
     return true;
 }
 
-bool loadLastUpdated(const QString &, QDateTime &lastUpdated) {
+bool loadLastUpdated(const QString &account, QDateTime &lastUpdated) {
     lastUpdated = {};
-    return false;
+    return reading([&](QSqlDatabase &db) {
+        QSqlQuery query(db);
+        if (!run(query, QStringLiteral("SELECT last_updated FROM accounts WHERE id = ?"), {account})
+            || !query.next()) {
+            return false;
+        }
+        lastUpdated = lastUpdatedFrom(query.value(0));
+        return true;
+    });
 }
 
 // ---- Plan tab ----

@@ -15,8 +15,8 @@
 // `account` is the opaque ID in Profile::accountId, returned by create() and signIn().
 // It never changes, even when the user changes their email.
 //
-// Functions marked "Stub until T12/T15" compile and are safe to call, but return
-// Result::StorageError or false until that ticket implements them.
+// Functions marked "Stub until T15" compile and are safe to call, but return
+// Result::StorageError until that ticket implements them.
 namespace LocalAccounts {
 enum class Result {
     Success,
@@ -192,7 +192,9 @@ Result editRefund(const QString &account, const Refund &updated, double &newBala
 Result removeRefund(const QString &account, const QString &refundId, double &newBalance);
 // Purchases, refunds and balance corrections, newest first.
 bool loadHistory(const QString &account, QList<HistoryEntry> &history);
-// Stub until T12. Last successful change to the balance or history.
+// Last successful change to the balance or history, in local time. Returns true with
+// an invalid QDateTime if nothing has changed since the account was created, and false
+// if the account doesn't exist or the database can't be read.
 bool loadLastUpdated(const QString &account, QDateTime &lastUpdated);
 
 // ---- Plan tab ----
