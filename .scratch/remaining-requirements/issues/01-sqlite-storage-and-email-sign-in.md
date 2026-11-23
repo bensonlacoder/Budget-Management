@@ -10,16 +10,16 @@
 
 **Blocked by:** 00 (Day-one skeleton)
 
-**Status:** ready-for-agent
+**Status:** done (branch `p1-storage`)
 
-- [ ] The database file lives in the app's local data folder, and its tables are created on first run
-- [ ] Data has tables for accounts, purchases, refunds, balance corrections, friends, friend requests, settings (reserve, habits, alerts, days correction), and saved menu sections
-- [ ] Sign-up asks for email, display name, dining plan, and password; emails are unique regardless of upper or lower case, and an invalid email format is rejected
-- [ ] Sign-in uses email and password; usernames are removed everywhere
-- [ ] Passwords are still stored as salted PBKDF2 hashes
-- [ ] The Law Plan is removed from the dining plan list
-- [ ] Any write that changes more than one table (for example, a purchase and the balance) happens in a single transaction
-- [ ] If the database can't be opened, sign-in shows a clear error and the app does not crash
-- [ ] `accounts.json` is no longer read or written
-- [ ] Tests run against a temporary database, and every storage function has at least one success test and one failure test
-- [ ] **Day-3 checkpoint:** sign-up, sign-in, balance, and purchases work on SQLite
+- [x] The database file lives in the app's local data folder, and its tables are created on first run
+- [x] Data has tables for accounts, purchases, refunds, balance corrections, friends, friend requests, settings (reserve, habits, alerts, days correction), and saved menu sections
+- [x] Sign-up asks for email, display name, dining plan, and password; emails are unique regardless of upper or lower case, and an invalid email format is rejected
+- [x] Sign-in uses email and password; usernames are removed everywhere
+- [x] Passwords are still stored as salted PBKDF2 hashes
+- [x] The Law Plan is removed from the dining plan list
+- [x] Any write that changes more than one table (for example, a purchase and the balance) happens in a single transaction
+- [x] If the database can't be opened, sign-in shows a clear error and the app does not crash
+- [x] `accounts.json` is no longer read or written
+- [x] Tests run against a temporary database, and every storage function has at least one success test and one failure test
+- [x] **Day-3 checkpoint:** sign-up, sign-in, balance, and purchases work on SQLite

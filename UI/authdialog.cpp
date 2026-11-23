@@ -10,7 +10,7 @@
 #include <QVBoxLayout>
 
 AuthDialog::AuthDialog(QWidget *parent)
-    : QDialog(parent), heading(new QLabel(this)), username(new QLineEdit(this)),
+    : QDialog(parent), heading(new QLabel(this)), email(new QLineEdit(this)),
       displayNameLabel(new QLabel(tr("&Display name"), this)), displayName(new QLineEdit(this)),
       diningPlanLabel(new QLabel(tr("Dining &plan"), this)), diningPlan(new QComboBox(this)),
       password(new QLineEdit(this)), confirmationLabel(new QLabel(tr("Con&firm password"), this)),
@@ -24,19 +24,19 @@ AuthDialog::AuthDialog(QWidget *parent)
     headingFont.setBold(true);
     heading->setFont(headingFont);
 
-    username->setObjectName("usernameEdit");
+    email->setObjectName("emailEdit");
+    email->setPlaceholderText(tr("you@scu.edu"));
+    email->setMaxLength(LocalAccounts::MaxEmailLength);
     displayName->setObjectName("displayNameEdit");
     displayName->setPlaceholderText(tr("Visible to friends"));
+    displayName->setMaxLength(LocalAccounts::MaxDisplayNameLength);
     displayNameLabel->setBuddy(displayName);
     diningPlan->setObjectName("diningPlanComboBox");
     diningPlan->setPlaceholderText(tr("Select a dining plan"));
     diningPlanLabel->setBuddy(diningPlan);
     for (const auto &plan : LocalAccounts::diningPlans()) {
         const QString points = locale().toString(plan.startingPoints);
-        const QString label = plan.perSemester
-            ? tr("%1 (%2 points per semester)").arg(plan.name, points)
-            : tr("%1 (%2 points per quarter)").arg(plan.name, points);
-        diningPlan->addItem(label, plan.id);
+        diningPlan->addItem(tr("%1 (%2 points per quarter)").arg(plan.name, points), plan.id);
     }
     password->setObjectName("passwordEdit");
     confirmation->setObjectName("confirmationEdit");
@@ -44,9 +44,12 @@ AuthDialog::AuthDialog(QWidget *parent)
     confirmation->setEchoMode(QLineEdit::Password);
     confirmationLabel->setBuddy(confirmation);
     message->setWordWrap(true);
+    message->setObjectName("authMessage");
+    submitButton->setObjectName("submitButton");
+    switchButton->setObjectName("switchButton");
 
     auto *form = new QFormLayout;
-    form->addRow(tr("&Username"), username);
+    form->addRow(tr("&Email"), email);
     form->addRow(displayNameLabel, displayName);
     form->addRow(diningPlanLabel, diningPlan);
     form->addRow(tr("&Password"), password);
@@ -75,13 +78,13 @@ AuthDialog::AuthDialog(QWidget *parent)
 }
 
 void AuthDialog::reset() {
-    username->clear();
+    email->clear();
     signedInProfile = {};
     setCreatingAccount(false);
 }
 
 QString AuthDialog::accountName() const {
-    return username->text().trimmed();
+    return signedInProfile.accountId;
 }
 
 const LocalAccounts::Profile &AuthDialog::profile() const {
@@ -104,14 +107,14 @@ void AuthDialog::setCreatingAccount(bool creating) {
     password->clear();
     confirmation->clear();
     message->clear();
-    username->setFocus();
+    email->setFocus();
 }
 
 void AuthDialog::submit() {
-    const QString enteredUsername = accountName();
+    const QString enteredEmail = email->text().trimmed();
     const QString enteredPassword = password->text();
-    if (enteredUsername.isEmpty() || enteredPassword.isEmpty()) {
-        message->setText(tr("Enter your username and password."));
+    if (enteredEmail.isEmpty() || enteredPassword.isEmpty()) {
+        message->setText(tr("Enter your email and password."));
         return;
     }
     if (creatingAccount && enteredPassword != confirmation->text()) {
@@ -121,9 +124,9 @@ void AuthDialog::submit() {
 
     using LocalAccounts::Result;
     const Result result = creatingAccount
-        ? LocalAccounts::create(enteredUsername, enteredPassword, displayName->text(),
+        ? LocalAccounts::create(enteredEmail, enteredPassword, displayName->text(),
                                 diningPlan->currentData().toString(), signedInProfile)
-        : LocalAccounts::signIn(enteredUsername, enteredPassword, signedInProfile);
+        : LocalAccounts::signIn(enteredEmail, enteredPassword, signedInProfile);
 
     switch (result) {
     case Result::Success:
@@ -131,8 +134,9 @@ void AuthDialog::submit() {
         confirmation->clear();
         accept();
         return;
-    case Result::InvalidUsername:
-        message->setText(tr("Use 3 to 32 letters, numbers, or underscores for your username."));
+    case Result::InvalidEmail:
+        message->setText(tr("Enter a valid email address, such as you@scu.edu."));
+        email->setFocus();
         break;
     case Result::InvalidDisplayName:
         message->setText(tr("Enter a display name of up to 32 characters."));
@@ -145,16 +149,16 @@ void AuthDialog::submit() {
     case Result::ShortPassword:
         message->setText(tr("Choose a password with at least 8 characters."));
         break;
-    case Result::UsernameTaken:
-        message->setText(tr("That username is already in use."));
+    case Result::EmailTaken:
+        message->setText(tr("An account already uses that email. Sign in instead."));
         break;
     case Result::IncorrectCredentials:
-        message->setText(tr("Incorrect username or password."));
+        message->setText(tr("Incorrect email or password."));
         password->clear();
         password->setFocus();
         break;
     default:
-        message->setText(tr("Could not access local accounts. Try again."));
+        message->setText(tr("Could not open the account database. Try again."));
         break;
     }
 }

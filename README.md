@@ -67,8 +67,9 @@ compiler, choose a new build directory in all commands.
 
 ### Sign in
 
-Create an account with a username (3 to 32 letters, numbers or underscores), a
-display name, a dining plan and a password of at least 8 characters. Your balance
+Create an account with your email address, a display name (up to 32 characters), a
+quarter dining plan and a password of at least 8 characters, then sign in with your
+email and password. Upper and lower case in the email don't matter. Your balance
 starts at the plan's points. Use **Account > Sign out** to switch accounts.
 
 ### Purchases tab
@@ -107,18 +108,15 @@ With fewer than 7 days left, the weekly recommendation equals the remaining bala
 
 ## Scope and limitations
 
-> **Planned storage change:** account storage is moving from `accounts.json` to a local
-> SQLite database with sign-in by email (ticket T01). Accounts saved in `accounts.json`
-> will **not** be carried over; everyone creates a new account after that change.
-
-Accounts are stored in `accounts.json` in the app's local data folder (on Windows,
-`%LOCALAPPDATA%\DiningPointsBudget`). Passwords are stored as salted PBKDF2 hashes.
-Accounts and friends exist only on that computer. Each account's days-left count is
+Accounts are stored in a SQLite database, `budget.sqlite`, in the app's local data
+folder (on Windows, `%LOCALAPPDATA%\DiningPointsBudget`). Passwords are stored as
+salted PBKDF2 hashes, and points are stored as whole cents. Accounts and friends exist
+only on that computer. Accounts from the earlier `accounts.json` file are **not**
+carried over; create a new account. Only quarter dining plans are offered. Each account's days-left count is
 saved with the date you set it, and at sign-in it is reduced by the days that have
 passed since then (new accounts start at 77). The app does not connect to a real
 dining account. Built-in menu prices are a dated reference (see
-[docs/dining-menu.md](docs/dining-menu.md)). Qt SQL is a build dependency inherited
-from the template; the app does not use a database.
+[docs/dining-menu.md](docs/dining-menu.md)).
 
 ## Tests and continuous integration
 
@@ -144,11 +142,13 @@ Each test case in [SPECIFICATIONS.md](SPECIFICATIONS.md) has a test whose name
 starts with its ID (for example `SP-03:`).
 
 `tests/ui/*.cpp` build into a second binary, `ui_tests`, which runs with a
-`QApplication` (offscreen in CTest). It covers the Budget and Purchases tabs, the
-saved account store (sign-in, balances, purchases, friends), and SCU hours parsing.
+`QApplication` (offscreen in CTest). It covers the sign-in dialog, the Budget and
+Purchases tabs, the SQLite account store (every storage function, with success and
+failure cases), and SCU hours parsing.
 `tests/ui/remaining_days_test.cpp` supplies its `main()`. Tests that touch saved
 accounts use `TestAccountStore` from `tests/ui/test_account_store.h`, which points
-the app at a temporary `accounts.json` so your real accounts are never modified.
+the app at a temporary database and deletes it afterwards, so your real accounts are
+never modified. Pass `Profile::accountId` (not the email) to storage functions.
 
 `.github/workflows/ci.yml` configures, builds, and runs CTest on Ubuntu for pushes
 and pull requests. Open the repository's **Actions** tab to inspect each run.
@@ -164,7 +164,9 @@ again to confirm a passing run. Keep the submitted application branch passing.
 - `UI/mainui.ui`: define the layout; edit it in Qt Designer.
 - `UI/main.cpp`: show sign-in, then build the main window, tabs and Account menu.
 - `UI/authdialog.*`: sign in or create an account.
-- `UI/localaccounts.*`: save accounts, balances, purchases and friends to `accounts.json`.
+- `UI/localaccounts.*`: all saved data (accounts, balances, purchases, refunds,
+  corrections, plan settings, friends, saved menu sections) in SQLite. Pages call only
+  these functions and never open the database themselves.
 - `UI/purchasespage.*`: log and remove purchases and show opening hours.
 - `UI/scumenu.*` and `UI/lunchcatalog.cpp`: SCU locations, menu prices and hours parsing.
 - `UI/friendsdialog.*`: send, accept and view friend requests.
