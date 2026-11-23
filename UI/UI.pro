@@ -1,4 +1,4 @@
-QT += widgets
+QT += widgets network
 
 CONFIG += c++17
 
@@ -7,13 +7,24 @@ INCLUDEPATH += ../src
 SOURCES += \
     ../src/balance.cpp \
     ../src/budget.cpp \
+    authdialog.cpp \
+    friendsdialog.cpp \
+    localaccounts.cpp \
     main.cpp \
-    mainui.cpp
+    mainui.cpp \
+    purchasespage.cpp \
+    lunchcatalog.cpp \
+    scumenu.cpp
 
 HEADERS += \
     ../src/balance.h \
     ../src/budget.h \
-    mainui.h
+    authdialog.h \
+    friendsdialog.h \
+    localaccounts.h \
+    mainui.h \
+    purchasespage.h \
+    scumenu.h
 
 FORMS += \
     mainui.ui

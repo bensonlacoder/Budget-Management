@@ -33,26 +33,26 @@ TEST_CASE("Balance buttons update the displayed balance and recommendations") {
     CHECK(balance->text() == "0.00 points");
     CHECK(daily->text() == "0.00 points");
     CHECK(weekly->text() == "0.00 points");
-    CHECK(days->value() == 70);
+    CHECK(days->value() == MainUI::DefaultRemainingDays); // 77
 
     amount->setValue(700.0);
     QTest::mouseClick(setBalance, Qt::LeftButton);
     CHECK(balance->text() == "700.00 points");
-    CHECK(daily->text() == "10.00 points");
-    CHECK(weekly->text() == "70.00 points");
+    CHECK(daily->text() == "9.09 points");
+    CHECK(weekly->text() == "63.63 points");
 
     SUBCASE("Refills and purchases refresh every displayed value") {
         amount->setValue(70.0);
         QTest::mouseClick(add, Qt::LeftButton);
         CHECK(balance->text() == "770.00 points");
-        CHECK(daily->text() == "11.00 points");
-        CHECK(weekly->text() == "77.00 points");
+        CHECK(daily->text() == "10.00 points");
+        CHECK(weekly->text() == "70.00 points");
 
         amount->setValue(12.5);
         QTest::mouseClick(spend, Qt::LeftButton);
         CHECK(balance->text() == "757.50 points");
-        CHECK(daily->text() == "10.82 points");
-        CHECK(weekly->text() == "75.75 points");
+        CHECK(daily->text() == "9.83 points");
+        CHECK(weekly->text() == "68.86 points");
 
         amount->setValue(757.5);
         QTest::mouseClick(spend, Qt::LeftButton);
@@ -64,22 +64,22 @@ TEST_CASE("Balance buttons update the displayed balance and recommendations") {
         amount->setValue(350.0);
         QTest::mouseClick(setBalance, Qt::LeftButton);
         CHECK(balance->text() == "350.00 points");
-        CHECK(daily->text() == "5.00 points");
-        CHECK(weekly->text() == "35.00 points");
+        CHECK(daily->text() == "4.54 points");
+        CHECK(weekly->text() == "31.81 points");
     }
     SUBCASE("Overspending shows an error and preserves all displayed values") {
         amount->setValue(701.0);
         QTest::mouseClick(spend, Qt::LeftButton);
         CHECK(error->text() == "Not enough points. Enter an amount no greater than your balance.");
         CHECK(balance->text() == "700.00 points");
-        CHECK(daily->text() == "10.00 points");
-        CHECK(weekly->text() == "70.00 points");
+        CHECK(daily->text() == "9.09 points");
+        CHECK(weekly->text() == "63.63 points");
 
         amount->setValue(70.0);
         QTest::mouseClick(spend, Qt::LeftButton);
         CHECK(balance->text() == "630.00 points");
-        CHECK(daily->text() == "9.00 points");
-        CHECK(weekly->text() == "63.00 points");
+        CHECK(daily->text() == "8.18 points");
+        CHECK(weekly->text() == "57.27 points");
         CHECK(error->text() == "Successfully Updated");
     }
 }
