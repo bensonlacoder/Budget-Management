@@ -26,7 +26,7 @@ constexpr int HASH_ITERATIONS = 600000;
 constexpr int FRIEND_ID_LENGTH = 12;
 // Wait this long if another window of the app is writing the database.
 constexpr int BUSY_TIMEOUT_MS = 3000;
-constexpr int SCHEMA_VERSION = 1;
+constexpr int SCHEMA_VERSION = 2;
 const QString CONNECTION = QStringLiteral("dining-points-budget");
 
 // ---- Points are stored as whole cents so comparisons are exact. ----
@@ -106,7 +106,7 @@ bool createSchema(QSqlDatabase &db) {
         " location TEXT NOT NULL,"
         " item TEXT NOT NULL,"
         " points_cents INTEGER NOT NULL CHECK (points_cents > 0),"
-        " created_ms INTEGER NOT NULL)",
+        " seq INTEGER NOT NULL)",
         "CREATE TABLE IF NOT EXISTS refunds ("
         " id TEXT PRIMARY KEY,"
         " account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,"
@@ -114,13 +114,13 @@ bool createSchema(QSqlDatabase &db) {
         " date TEXT NOT NULL,"
         " points_cents INTEGER NOT NULL CHECK (points_cents > 0),"
         " note TEXT NOT NULL,"
-        " created_ms INTEGER NOT NULL)",
+        " seq INTEGER NOT NULL)",
         "CREATE TABLE IF NOT EXISTS corrections ("
         " id TEXT PRIMARY KEY,"
         " account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,"
         " date TEXT NOT NULL,"
         " change_cents INTEGER NOT NULL,"
-        " created_ms INTEGER NOT NULL)",
+        " seq INTEGER NOT NULL)",
         "CREATE TABLE IF NOT EXISTS friendships ("
         " account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,"
         " friend_account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,"
@@ -137,8 +137,20 @@ bool createSchema(QSqlDatabase &db) {
         "CREATE INDEX IF NOT EXISTS refunds_by_purchase ON refunds(purchase_id)",
     };
     QSqlQuery query(db);
-    if (!query.exec(QStringLiteral("PRAGMA busy_timeout = %1").arg(BUSY_TIMEOUT_MS))) {
+    if (!query.exec(QStringLiteral("PRAGMA busy_timeout = %1").arg(BUSY_TIMEOUT_MS))
+        || !query.exec(QStringLiteral("PRAGMA user_version")) || !query.next()) {
         return false;
+    }
+    // Version 1 ordered history by save time in milliseconds, which ties when entries
+    // are saved within the same millisecond. Version 2 uses a shared sequence instead;
+    // the old values are still increasing, so they are kept as sequence numbers.
+    if (query.value(0).toInt() == 1) {
+        for (const char *table : {"purchases", "refunds", "corrections"}) {
+            if (!query.exec(QStringLiteral("ALTER TABLE %1 RENAME COLUMN created_ms TO seq")
+                                .arg(QLatin1String(table)))) {
+                return false;
+            }
+        }
     }
     for (const char *statement : statements) {
         if (!query.exec(QString::fromLatin1(statement))) {
@@ -393,8 +405,19 @@ Result checkRefundLink(QSqlDatabase &db, const QString &account, const QString &
     return cents > points - refunded ? Result::RefundTooLarge : Result::Success;
 }
 
-qint64 nowMs() {
-    return QDateTime::currentMSecsSinceEpoch();
+// The next number in the order history entries were recorded, shared by purchases,
+// refunds and corrections. Call it inside the transaction that inserts the entry.
+// Returns NULL on failure, which the NOT NULL column then rejects.
+QVariant nextSequence(QSqlDatabase &db) {
+    QSqlQuery query(db);
+    if (!query.exec(QStringLiteral(
+            "SELECT MAX(COALESCE((SELECT MAX(seq) FROM purchases), 0),"
+            " COALESCE((SELECT MAX(seq) FROM refunds), 0),"
+            " COALESCE((SELECT MAX(seq) FROM corrections), 0)) + 1"))
+        || !query.next()) {
+        return {};
+    }
+    return query.value(0).toLongLong();
 }
 
 QString habitsText(const LocalAccounts::DiningHabits &habits) {
@@ -615,8 +638,9 @@ Result correctBalance(const QString &account, CorrectionMode mode, double amount
         }
         QSqlQuery query(db);
         return run(query, QStringLiteral("INSERT INTO corrections (id, account_id, date, change_cents,"
-                                         " created_ms) VALUES (?, ?, ?, ?, ?)"),
-                   {newId(), account, QDate::currentDate().toString(Qt::ISODate), change, nowMs()})
+                                         " seq) VALUES (?, ?, ?, ?, ?)"),
+                   {newId(), account, QDate::currentDate().toString(Qt::ISODate), change,
+                    nextSequence(db)})
             ? Result::Success
             : Result::StorageError;
     });
@@ -679,9 +703,9 @@ Result recordPurchase(const QString &account, const Purchase &purchase, double &
         }
         QSqlQuery query(db);
         return run(query, QStringLiteral("INSERT INTO purchases (id, account_id, date, location, item,"
-                                         " points_cents, created_ms) VALUES (?, ?, ?, ?, ?, ?, ?)"),
+                                         " points_cents, seq) VALUES (?, ?, ?, ?, ?, ?, ?)"),
                    {newId(), account, purchase.date.toString(Qt::ISODate), location, item, cents,
-                    nowMs()})
+                    nextSequence(db)})
             ? Result::Success
             : Result::StorageError;
     });
@@ -761,7 +785,7 @@ bool loadPurchases(const QString &account, QList<Purchase> &purchases) {
         }
         QSqlQuery query(db);
         if (!run(query, QStringLiteral("SELECT date, location, item, points_cents, id FROM purchases"
-                                       " WHERE account_id = ? ORDER BY date DESC, created_ms DESC,"
+                                       " WHERE account_id = ? ORDER BY date DESC, seq DESC,"
                                        " rowid DESC"),
                  {account})) {
             return false;
@@ -798,9 +822,9 @@ Result recordRefund(const QString &account, const Refund &refund, double &newBal
         QSqlQuery query(db);
         const QVariant purchaseId = refund.purchaseId.isEmpty() ? QVariant() : QVariant(refund.purchaseId);
         return run(query, QStringLiteral("INSERT INTO refunds (id, account_id, purchase_id, date,"
-                                         " points_cents, note, created_ms) VALUES (?, ?, ?, ?, ?, ?, ?)"),
+                                         " points_cents, note, seq) VALUES (?, ?, ?, ?, ?, ?, ?)"),
                    {newId(), account, purchaseId, refund.date.toString(Qt::ISODate), cents, note,
-                    nowMs()})
+                    nextSequence(db)})
             ? Result::Success
             : Result::StorageError;
     });
@@ -889,7 +913,7 @@ bool loadHistory(const QString &account, QList<HistoryEntry> &history) {
             return false;
         }
         QSqlQuery query(db);
-        if (!run(query, QStringLiteral("SELECT date, location, item, points_cents, id, created_ms"
+        if (!run(query, QStringLiteral("SELECT date, location, item, points_cents, id, seq"
                                        " FROM purchases WHERE account_id = ?"), {account})) {
             return false;
         }
@@ -901,7 +925,7 @@ bool loadHistory(const QString &account, QList<HistoryEntry> &history) {
                                       -fromCents(query.value(3).toLongLong()),
                                       query.value(4).toString()}});
         }
-        if (!run(query, QStringLiteral("SELECT date, note, points_cents, id, purchase_id, created_ms"
+        if (!run(query, QStringLiteral("SELECT date, note, points_cents, id, purchase_id, seq"
                                        " FROM refunds WHERE account_id = ?"), {account})) {
             return false;
         }
@@ -913,7 +937,7 @@ bool loadHistory(const QString &account, QList<HistoryEntry> &history) {
                                       fromCents(query.value(2).toLongLong()),
                                       query.value(3).toString(), query.value(4).toString()}});
         }
-        if (!run(query, QStringLiteral("SELECT date, change_cents, id, created_ms FROM corrections"
+        if (!run(query, QStringLiteral("SELECT date, change_cents, id, seq FROM corrections"
                                        " WHERE account_id = ?"), {account})) {
             return false;
         }
@@ -929,7 +953,7 @@ bool loadHistory(const QString &account, QList<HistoryEntry> &history) {
     if (!loaded) {
         return false;
     }
-    // Newest date first; within a day, the most recently recorded first.
+    // Newest date first; within a day, the most recently recorded (highest seq) first.
     std::stable_sort(rows.begin(), rows.end(), [](const auto &left, const auto &right) {
         if (left.second.date != right.second.date) {
             return left.second.date > right.second.date;

@@ -432,6 +432,58 @@ TEST_CASE("Refunds return points, respect the purchase total and can be edited o
     CHECK_FALSE(LocalAccounts::loadHistory("nobody", history));
 }
 
+TEST_CASE("History keeps the recorded order even when entries are saved in the same instant") {
+    // Regression: ordering by save time tied when a fast machine saved several entries
+    // within one millisecond, so purchases always sorted ahead of refunds.
+    TestAccountStore store;
+    const auto account = createAccount("order@scu.edu", "Orderly").accountId;
+    const QDate today = QDate::currentDate();
+    double balance = 0.0;
+    QStringList expected; // Newest first.
+    for (int round = 0; round < 20; ++round) {
+        REQUIRE(LocalAccounts::recordPurchase(account, {today, "Marketplace", QString::number(round), 1.0},
+                                              balance) == Result::Success);
+        expected.prepend("purchase " + QString::number(round));
+        REQUIRE(LocalAccounts::recordRefund(account, {today, 0.5, {}, QString::number(round)}, balance)
+                == Result::Success);
+        expected.prepend("refund " + QString::number(round));
+        REQUIRE(LocalAccounts::correctBalance(account, CorrectionMode::Add, 0.25, balance)
+                == Result::Success);
+        expected.prepend("correction");
+    }
+    QList<HistoryEntry> history;
+    REQUIRE(LocalAccounts::loadHistory(account, history));
+    QStringList actual;
+    for (const auto &entry : history) {
+        actual << (entry.kind == HistoryEntry::Kind::Purchase ? "purchase " + entry.item
+                   : entry.kind == HistoryEntry::Kind::Refund ? "refund " + entry.item
+                                                              : QStringLiteral("correction"));
+    }
+    CHECK(actual == expected);
+}
+
+TEST_CASE("A version-1 database is upgraded without losing data") {
+    TestAccountStore store;
+    const auto account = createAccount("old@scu.edu", "Old Timer").accountId;
+    double balance = 0.0;
+    REQUIRE(LocalAccounts::recordPurchase(account, {QDate::currentDate(), "Marketplace", "Old", 2.0},
+                                          balance) == Result::Success);
+    // Turn the database back into the version-1 layout.
+    tamper({"ALTER TABLE purchases RENAME COLUMN seq TO created_ms",
+            "ALTER TABLE refunds RENAME COLUMN seq TO created_ms",
+            "ALTER TABLE corrections RENAME COLUMN seq TO created_ms",
+            "PRAGMA user_version = 1"});
+
+    REQUIRE(LocalAccounts::recordPurchase(account, {QDate::currentDate(), "Marketplace", "New", 3.0},
+                                          balance) == Result::Success);
+    QList<HistoryEntry> history;
+    REQUIRE(LocalAccounts::loadHistory(account, history));
+    REQUIRE(history.size() == 2);
+    CHECK(history.at(0).item == "New");
+    CHECK(history.at(1).item == "Old");
+    CHECK(balance == 2232.0);
+}
+
 TEST_CASE("Removing a refund whose points were already spent is refused") {
     TestAccountStore store;
     const auto buyer = createAccount("spent@scu.edu", "Spender", "apartment").accountId; // 336
