@@ -1,6 +1,15 @@
 #include "budget.h"
 
+#include <cmath>
 #include <stdexcept>
+
+namespace {
+// Rounds down to whole hundredths of a point. The small tolerance stops values such as
+// 0.29, stored as 0.28999..., from dropping a cent.
+double floorToHundredths(double points) {
+    return std::floor(points * 100.0 + 1e-6) / 100.0;
+}
+}
 
 Budget::Budget(const Balance &balance, int remainingDays)
     : balance(balance), remainingDays(1) {
@@ -25,12 +34,12 @@ double Budget::getDailyBudget() const {
     if (remainingDays == 0) {
         return balance.getBalance();
     }
-    return balance.getBalance() / remainingDays;
+    return floorToHundredths(balance.getBalance() / remainingDays);
 }
 
 double Budget::getWeeklyBudget() const {
     if (remainingDays < DAYS_PER_WEEK) {
         return balance.getBalance();
     }
-    return getDailyBudget() * DAYS_PER_WEEK;
+    return floorToHundredths(balance.getBalance() * DAYS_PER_WEEK / remainingDays);
 }

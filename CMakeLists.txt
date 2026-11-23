@@ -16,8 +16,13 @@ find_package(Qt6 COMPONENTS Widgets Sql Test Network REQUIRED)
 file(GLOB APP_SOURCES  CONFIGURE_DEPENDS src/*.cpp)
 file(GLOB TEST_SOURCES CONFIGURE_DEPENDS tests/*.cpp)
 
+set(PURCHASE_SOURCES UI/purchasespage.cpp UI/purchasespage.h UI/scumenu.cpp UI/scumenu.h
+    UI/lunchcatalog.cpp UI/localaccounts.cpp UI/localaccounts.h)
+
 add_executable(app ${APP_SOURCES} UI/main.cpp UI/mainui.cpp UI/mainui.h UI/mainui.ui
-    UI/authdialog.cpp UI/authdialog.h UI/localaccounts.cpp UI/localaccounts.h)
+    UI/authdialog.cpp UI/authdialog.h
+    UI/friendsdialog.cpp UI/friendsdialog.h
+    ${PURCHASE_SOURCES})
 target_link_libraries(app PRIVATE Qt6::Widgets Qt6::Sql Qt6::Network)
 target_include_directories(app PRIVATE src UI)
 
@@ -30,10 +35,13 @@ target_include_directories(test_build PRIVATE src tests)
 enable_testing()
 add_test(NAME test_build COMMAND test_build)
 
-# Exercise day-entry validation through the real Qt widgets.
-add_executable(ui_tests tests/ui/remaining_days_test.cpp tests/ui/balance_test.cpp ${APP_SOURCES}
+# Exercise the Qt widgets, saved accounts and menu parsing. Every tests/ui/*.cpp
+# file is included; remaining_days_test.cpp supplies main() with a QApplication.
+file(GLOB UI_TEST_SOURCES CONFIGURE_DEPENDS tests/ui/*.cpp)
+add_executable(ui_tests ${UI_TEST_SOURCES}
+    ${PURCHASE_SOURCES} ${APP_SOURCES}
     UI/mainui.cpp UI/mainui.h UI/mainui.ui)
-target_link_libraries(ui_tests PRIVATE Qt6::Widgets Qt6::Test)
+target_link_libraries(ui_tests PRIVATE Qt6::Widgets Qt6::Test Qt6::Network)
 target_include_directories(ui_tests PRIVATE src UI tests)
 add_test(NAME ui_tests COMMAND ui_tests)
 set_tests_properties(ui_tests PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

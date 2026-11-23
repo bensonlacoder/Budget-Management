@@ -21,7 +21,9 @@ shown as `700.00 points`.
 **Add points** increases the balance by the entered amount. **Spend points**
 decreases it by the entered amount. Spending the entire balance is allowed and
 leaves 0. The user can make successive balance changes in the same session;
-each change uses the latest balance.
+each change uses the latest balance. The balance is kept to two decimal places,
+so any balance shown can be spent in full (for example, 0.70 + 0.10 shows 0.80
+and spending 0.80 leaves 0).
 
 **Test case:** start at 700, add 50 to get 750, spend 25 to get 725, then spend
 725 to get 0.
@@ -45,8 +47,8 @@ balance immediately after each rejected operation.
 
 **UI test:** set 700 points, then try to spend 701. The app shows the
 insufficient-points message and preserves the displayed balance and both
-recommendations. Spending 70 afterward succeeds, showing 630 points, 9 per day,
-and 63 for the next 7 days with the default 70 days remaining.
+recommendations. Spending 70 afterward succeeds, showing 630 points, 8.18 per day,
+and 57.27 for the next 7 days with the default 77 days remaining.
 
 ## SP-04: Recommend daily and weekly spending
 
@@ -54,7 +56,8 @@ and 63 for the next 7 days with the default 70 days remaining.
 
 Remaining days counts today and must be a whole number from 0 to 90, inclusive.
 Zero days means the budgeting period has ended.
-The app starts with 70 remaining days. Typed day counts are validated when the
+The app starts with 77 remaining days. The count goes down by one each day, including
+while the app is open, and never below 0. **Reset days** sets it back to 77 and saves it. Typed day counts are validated when the
 user presses Enter or leaves the field; arrow adjustments are validated immediately.
 If the user enters more than 90 days, the app restores the previous day count,
 keeps the existing recommendations, and displays `Remaining days must be between
@@ -64,8 +67,10 @@ this range throws `std::invalid_argument`. A rejected update leaves the previous
 remaining-day count unchanged.
 
 - With 0 days remaining, both recommendations equal the current balance; the balance is unchanged.
-- With at least 1 day remaining, per day = current balance / remaining days.
-- Next 7 days = per day x 7, or the whole balance if fewer than 7 days remain, including 0.
+- With at least 1 day remaining, per day = current balance / remaining days, rounded down to the
+  nearest hundredth so following the advice never spends more than the balance.
+- Next 7 days = current balance x 7 / remaining days, rounded down the same way, or the whole
+  balance if fewer than 7 days remain, including 0.
 - Recommendations use the latest balance and update when the balance or days change.
 
 **Test case:** with 700 points and 70 days, per day is 10 and next 7 days is 70.
@@ -82,7 +87,7 @@ Independently, spending 70 from 700 updates them to 9 per day and 63 per week.
 days throws. Constructing with 90 days and updating from 30 to 90 days both
 succeed and produce recommendations based on the new day count.
 
-**Balance UI cases:** verify the initial `0.00 points` display and default 70
+**Balance UI cases:** verify the initial `0.00 points` display and default 77
 days. Setting, adding, and spending update the balance and recommendations with
 two decimal places. Setting replaces an existing balance; spending the entire
 balance leaves all three displayed point amounts at zero.

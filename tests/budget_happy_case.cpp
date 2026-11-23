@@ -10,11 +10,10 @@ TEST_CASE("Budget can be initialized with a valid balance and remaining days") {
     Budget budget(balance, 30);
 
     CHECK(budget.getRemainingDays() == 30);
-    CHECK(budget.getDailyBudget() ==
-          doctest::Approx(500.0 / 30));
+    CHECK(budget.getDailyBudget() == doctest::Approx(16.66)); // 16.666... rounded down
 }
 
-TEST_CASE("Budget calculates daily and weekly allowances") {
+TEST_CASE("SP-04: 700 points over 70 days recommends 10 per day and 70 per week") {
     Balance balance;
     balance.setBalance(700.0);
     Budget budget(balance, 70);

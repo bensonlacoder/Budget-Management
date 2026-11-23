@@ -76,12 +76,22 @@
           </widget>
          </item>
          <item row="0" column="1">
-          <widget class="QSpinBox" name="remainingDaysSpinBox">
-           <property name="toolTip"><string>Enter 0 to 90 days, including today. Use 0 when the budgeting period has ended.</string></property>
-           <property name="keyboardTracking"><bool>false</bool></property>
-           <property name="minimum"><number>0</number></property>
-           <property name="maximum"><number>2147483647</number></property>
-          </widget>
+          <layout class="QHBoxLayout" name="remainingDaysLayout">
+           <item>
+            <widget class="QSpinBox" name="remainingDaysSpinBox">
+             <property name="toolTip"><string>Enter 0 to 90 days, including today. Use 0 when the budgeting period has ended. The count goes down by one each day.</string></property>
+             <property name="keyboardTracking"><bool>false</bool></property>
+             <property name="minimum"><number>0</number></property>
+             <property name="maximum"><number>2147483647</number></property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="resetDaysButton">
+             <property name="toolTip"><string>Set days left back to the starting count for the quarter.</string></property>
+             <property name="text"><string>Reset days</string></property>
+            </widget>
+           </item>
+          </layout>
          </item>
          <item row="1" column="0"><widget class="QLabel" name="dailyBudgetLabel"><property name="text"><string>Per day:</string></property></widget></item>
          <item row="1" column="1"><widget class="QLabel" name="dailyBudgetValueLabel"><property name="text"><string>0.00 points</string></property></widget></item>
@@ -102,6 +112,7 @@
   <tabstop>addPointsButton</tabstop>
   <tabstop>spendPointsButton</tabstop>
   <tabstop>remainingDaysSpinBox</tabstop>
+  <tabstop>resetDaysButton</tabstop>
  </tabstops>
  <resources/>
  <connections/>
