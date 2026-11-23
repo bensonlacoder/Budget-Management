@@ -528,4 +528,94 @@ Result respondToRequest(const QString &username, const QString &friendId, bool a
         return Result::Success;
     });
 }
+// ---- Stubs until T01. Each one fails safely so pages can be built against it now. ----
+
+bool loadProfile(const QString &, Profile &profile) {
+    profile = {};
+    return false;
+}
+
+Result updateProfile(const QString &, const QString &, const QString &) {
+    return Result::StorageError;
+}
+
+Result changePassword(const QString &, const QString &, const QString &) {
+    return Result::StorageError;
+}
+
+Result correctBalance(const QString &, CorrectionMode, double, double &) {
+    return Result::StorageError;
+}
+
+Result clearDaysCorrection(const QString &) {
+    return Result::StorageError;
+}
+
+Result editPurchase(const QString &, const Purchase &, double &) {
+    return Result::StorageError;
+}
+
+Result recordRefund(const QString &, const Refund &, double &) {
+    return Result::StorageError;
+}
+
+Result editRefund(const QString &, const Refund &, double &) {
+    return Result::StorageError;
+}
+
+Result removeRefund(const QString &, const QString &, double &) {
+    return Result::StorageError;
+}
+
+bool loadHistory(const QString &, QList<HistoryEntry> &history) {
+    history.clear();
+    return false;
+}
+
+bool loadPlanSettings(const QString &, PlanSettings &settings) {
+    settings = {};
+    return false;
+}
+
+Result savePlanSettings(const QString &, const PlanSettings &) {
+    return Result::StorageError;
+}
+
+Result removeFriend(const QString &, const QString &) {
+    return Result::StorageError;
+}
+
+bool loadSavedSections(const QString &, QStringList &sections) {
+    sections.clear();
+    return false;
+}
+
+Result saveSection(const QString &, const QString &) {
+    return Result::StorageError;
+}
+
+Result removeSection(const QString &, const QString &) {
+    return Result::StorageError;
+}
+
+bool loadLastUpdated(const QString &, QDateTime &lastUpdated) {
+    lastUpdated = {};
+    return false;
+}
+
+Result sendVerificationCode(const QString &) {
+    return Result::StorageError;
+}
+
+Result verifyEmail(const QString &, const QString &) {
+    return Result::StorageError;
+}
+
+Result sendPasswordResetCode(const QString &) {
+    return Result::StorageError;
+}
+
+Result resetPassword(const QString &, const QString &, const QString &) {
+    return Result::StorageError;
+}
 }

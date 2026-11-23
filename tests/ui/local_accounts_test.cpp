@@ -244,3 +244,30 @@ TEST_CASE("A damaged saved balance is reported instead of crashing sign-in") {
     LocalAccounts::Profile profile;
     CHECK(LocalAccounts::signIn("damaged", "correct-horse", profile) == Result::StorageError);
 }
+
+// Author: Nathan Gu
+// Remove each check as T01 implements the function.
+TEST_CASE("Storage stubs fail safely until T01 implements them") {
+    TestAccountStore store;
+    createAccount("stubbed", "Stubbed");
+    double balance = 123.0;
+
+    LocalAccounts::Profile profile;
+    profile.displayName = "stale";
+    CHECK_FALSE(LocalAccounts::loadProfile("stubbed", profile));
+    CHECK(profile.displayName.isEmpty());
+    CHECK(LocalAccounts::correctBalance("stubbed", LocalAccounts::CorrectionMode::Add, 5, balance)
+          == Result::StorageError);
+    CHECK(balance == 123.0); // Output is untouched when nothing was saved.
+
+    QList<LocalAccounts::HistoryEntry> history{{}};
+    CHECK_FALSE(LocalAccounts::loadHistory("stubbed", history));
+    CHECK(history.isEmpty());
+
+    LocalAccounts::PlanSettings settings;
+    settings.reserveGoal = 50;
+    CHECK_FALSE(LocalAccounts::loadPlanSettings("stubbed", settings));
+    CHECK(settings.reserveGoal == 0.0);
+    CHECK(LocalAccounts::savePlanSettings("stubbed", settings) == Result::StorageError);
+    CHECK(LocalAccounts::removeFriend("stubbed", "ABC") == Result::StorageError);
+}

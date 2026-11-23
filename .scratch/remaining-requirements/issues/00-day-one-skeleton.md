@@ -13,7 +13,7 @@
 - [ ] The main window has Purchases, Budget, Plan, Charts, and Profile tabs; the new tabs show a placeholder
 - [ ] Every new source file is listed in CMake for both `app` and `ui_tests`, and `ui_tests` links Qt SQL
 - [ ] `PurchasesPage::balanceUpdated` is connected to the Plan, Charts, and Profile pages so they can refresh when the balance changes
-- [ ] P1 adds every storage function the tickets need to `localaccounts.h` as a stub that compiles and returns a failure or empty result. The functions are:
+- [x] P1 adds every storage function the tickets need to `localaccounts.h` as a stub that compiles and returns a failure or empty result. The functions are:
   - profile update
   - password change
   - balance correction (set, add, subtract)
