@@ -16,6 +16,7 @@ class AuthDialog : public QDialog {
 public:
     explicit AuthDialog(QWidget *parent = nullptr);
     void reset();
+    // The signed-in account's ID (Profile::accountId), passed to every storage call.
     QString accountName() const;
     const LocalAccounts::Profile &profile() const;
 
@@ -24,7 +25,7 @@ private:
     void submit();
 
     QLabel *heading;
-    QLineEdit *username;
+    QLineEdit *email;
     QLabel *displayNameLabel;
     QLineEdit *displayName;
     QLabel *diningPlanLabel;

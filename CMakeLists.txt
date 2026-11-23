@@ -40,8 +40,9 @@ add_test(NAME test_build COMMAND test_build)
 file(GLOB UI_TEST_SOURCES CONFIGURE_DEPENDS tests/ui/*.cpp)
 add_executable(ui_tests ${UI_TEST_SOURCES}
     ${PURCHASE_SOURCES} ${APP_SOURCES}
+    UI/authdialog.cpp UI/authdialog.h
     UI/mainui.cpp UI/mainui.h UI/mainui.ui)
-target_link_libraries(ui_tests PRIVATE Qt6::Widgets Qt6::Test Qt6::Network)
+target_link_libraries(ui_tests PRIVATE Qt6::Widgets Qt6::Test Qt6::Network Qt6::Sql)
 target_include_directories(ui_tests PRIVATE src UI tests)
 add_test(NAME ui_tests COMMAND ui_tests)
 set_tests_properties(ui_tests PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

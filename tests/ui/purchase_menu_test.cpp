@@ -22,9 +22,9 @@ void selectItem(QComboBox *menu, const QString &prefix) {
 TEST_CASE("Lunch purchases use station prices, selected options and receipt totals") {
     TestAccountStore store;
     LocalAccounts::Profile profile;
-    REQUIRE(LocalAccounts::create("lunch_test", "test-password", "Student", "basic", profile)
+    REQUIRE(LocalAccounts::create("lunch@example.com", "test-password", "Student", "basic", profile)
             == LocalAccounts::Result::Success);
-    PurchasesPage page("lunch_test");
+    PurchasesPage page(profile.accountId);
     auto *location = page.findChild<QComboBox *>("purchaseLocation");
     auto *menu = page.findChild<QComboBox *>("scuMenuItem");
     auto *choice = page.findChild<QComboBox *>("menuChoice");
@@ -57,7 +57,7 @@ TEST_CASE("Lunch purchases use station prices, selected options and receipt tota
     QObject::connect(&page, &PurchasesPage::balanceUpdated, [&](double value) { balance = value; });
     save->click();
     QList<LocalAccounts::Purchase> history;
-    REQUIRE(LocalAccounts::loadPurchases("lunch_test", history));
+    REQUIRE(LocalAccounts::loadPurchases(profile.accountId, history));
     REQUIRE(history.size() == 1);
     CHECK(history.first().location == "Marketplace / Trattoria");
     CHECK(history.first().item == "Build your own pasta (Full, Grilled chicken, Shrimp)");
@@ -73,7 +73,7 @@ TEST_CASE("Lunch purchases use station prices, selected options and receipt tota
     CHECK(balance == doctest::Approx(profile.balance - 18.10));
     points->setValue(16.33);
     save->click();
-    REQUIRE(LocalAccounts::loadPurchases("lunch_test", history));
+    REQUIRE(LocalAccounts::loadPurchases(profile.accountId, history));
     REQUIRE(history.size() == 2);
     CHECK(history.first().item == "BYO burger (Curly fries)");
     CHECK(balance == doctest::Approx(profile.balance - 18.10 - 16.33));
