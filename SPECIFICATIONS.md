@@ -47,8 +47,8 @@ balance immediately after each rejected operation.
 
 **UI test:** set 700 points, then try to spend 701. The app shows the
 insufficient-points message and preserves the displayed balance and both
-recommendations. Spending 70 afterward succeeds, showing 630 points, 9 per day,
-and 63 for the next 7 days with the default 70 days remaining.
+recommendations. Spending 70 afterward succeeds, showing 630 points, 8.18 per day,
+and 57.27 for the next 7 days with the default 77 days remaining.
 
 ## SP-04: Recommend daily and weekly spending
 
@@ -87,7 +87,7 @@ Independently, spending 70 from 700 updates them to 9 per day and 63 per week.
 days throws. Constructing with 90 days and updating from 30 to 90 days both
 succeed and produce recommendations based on the new day count.
 
-**Balance UI cases:** verify the initial `0.00 points` display and default 70
+**Balance UI cases:** verify the initial `0.00 points` display and default 77
 days. Setting, adding, and spending update the balance and recommendations with
 two decimal places. Setting replaces an existing balance; spending the entire
 balance leaves all three displayed point amounts at zero.

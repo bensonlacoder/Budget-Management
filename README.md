@@ -97,8 +97,10 @@ they accept, each of you can see the other's display name and balance.
 The amount field accepts numbers from 0 to 1,000,000 with two decimal places.
 It has no `points` suffix. Enter a new amount before each action. A blank amount
 or a purchase larger than the balance displays an error and leaves the balance
-unchanged. Remaining days starts at 70 and can be set from 0 to 90, including
-today. Entering more than 90 shows an error and keeps the previous day count.
+unchanged. Remaining days starts at 77, goes down by one each day, and can be set
+from 0 to 90, including today. Entering more than 90 shows an error and keeps the
+previous day count. **Reset days** sets it back to 77. Recommendations are rounded
+down to the nearest hundredth so following them never spends more than the balance.
 
 For example, 700 points over 70 days recommends 10 points per day and 70 per week.
 With fewer than 7 days left, the weekly recommendation equals the remaining balance.
@@ -133,10 +135,10 @@ in an `// Author:` comment above each test you write:
 
 | File | Covers |
 | --- | --- |
-| `tests/balance_happy_test.cpp` | Setting, adding and spending valid amounts |
-| `tests/balance_edge_test.cpp` | Zero amounts, rejected amounts, two-decimal rounding |
-| `tests/budget_happy_test.cpp` | Daily and weekly advice for a normal number of days |
-| `tests/budget_edge_test.cpp` | 0 and 90 day limits, fewer than 7 days, rejected day counts |
+| `tests/balance_happy_case.cpp` | Setting, adding and spending valid amounts |
+| `tests/balance_edge_case.cpp` | Zero amounts, rejected amounts, two-decimal rounding |
+| `tests/budget_happy_case.cpp` | Daily and weekly advice for a normal number of days |
+| `tests/budget_edge_case.cpp` | 0 and 90 day limits, fewer than 7 days, rejected day counts, rounding down |
 
 Each test case in [SPECIFICATIONS.md](SPECIFICATIONS.md) has a test whose name
 starts with its ID (for example `SP-03:`).
