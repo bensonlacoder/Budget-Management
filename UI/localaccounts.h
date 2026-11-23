@@ -14,9 +14,6 @@
 //
 // `account` is the opaque ID in Profile::accountId, returned by create() and signIn().
 // It never changes, even when the user changes their email.
-//
-// Functions marked "Stub until T15" compile and are safe to call, but return
-// Result::StorageError until that ticket implements them.
 namespace LocalAccounts {
 enum class Result {
     Success,
@@ -41,10 +38,10 @@ enum class Result {
     RefundUnavailable,
     FriendUnavailable,
     SectionUnavailable,
-    EmailNotVerified,    // T15: sign-in before the sign-up code was entered.
-    InvalidCode,         // T15
-    CodeExpired,         // T15
-    CodeNotSent,         // T15: the email sender could not be reached.
+    EmailNotVerified,    // Sign-in before the sign-up code was entered.
+    InvalidCode,         // Wrong code, no code requested, or too many wrong tries.
+    CodeExpired,         // Older than CodeLifetimeMinutes; request a new one.
+    CodeNotSent,         // The email sender could not be reached.
     StorageError         // The database could not be opened, read or written.
 };
 
@@ -144,9 +141,12 @@ struct PlanSettings {
 
 // ---- Accounts ----
 const QList<DiningPlan> &diningPlans();
-// The email is trimmed and matched without regard to case.
+// Creates an unverified account; call sendVerificationCode() next. The email is
+// trimmed and matched without regard to case. An unverified account with the same
+// email is replaced, so someone whose code never arrived can sign up again.
 Result create(const QString &email, const QString &password, const QString &displayName,
               const QString &diningPlanId, Profile &profile);
+// EmailNotVerified if the password is right but the email hasn't been verified yet.
 Result signIn(const QString &email, const QString &password, Profile &profile);
 bool loadProfile(const QString &account, Profile &profile);
 Result updateProfile(const QString &account, const QString &displayName, const QString &email);
@@ -217,10 +217,24 @@ bool loadSavedSections(const QString &account, QStringList &sections);
 Result saveSection(const QString &account, const QString &section);
 Result removeSection(const QString &account, const QString &section);
 
-// ---- Email codes: stubs until T15. Codes expire after 15 minutes. ----
+// ---- Email codes ----
+// Codes are 6 digits, sent with EmailSender, and stored only as a salted hash.
+// Sending a new code replaces the previous one. After MaxCodeAttempts wrong tries the
+// code is cancelled and a new one must be requested.
+constexpr int CodeLifetimeMinutes = 15;
+constexpr int MaxCodeAttempts = 5;
+
+// For an unverified account. InvalidEmail if no account uses the email; Success
+// without sending if it is already verified; CodeNotSent if sending failed.
 Result sendVerificationCode(const QString &email);
+// Marks the email verified so the account can sign in.
 Result verifyEmail(const QString &email, const QString &code);
+// Deletes the account if its email was never verified, for example when the first
+// code couldn't be sent. Does nothing to a verified account.
+void cancelSignUp(const QString &email);
+// For a verified account. InvalidEmail if no account uses the email.
 Result sendPasswordResetCode(const QString &email);
+// ShortPassword if the new password is too short (checked before the code).
 Result resetPassword(const QString &email, const QString &code, const QString &newPassword);
 }
 

@@ -6,10 +6,13 @@
 #include <QDialog>
 
 class QComboBox;
+class QFormLayout;
 class QLabel;
 class QLineEdit;
 class QPushButton;
 
+// Sign in, create an account, verify its email with a code, or reset a forgotten
+// password with a code. Accepted once the user is signed in.
 class AuthDialog : public QDialog {
     Q_OBJECT
 
@@ -21,22 +24,37 @@ public:
     const LocalAccounts::Profile &profile() const;
 
 private:
-    void setCreatingAccount(bool creating);
-    void submit();
+    enum class Screen { SignIn, CreateAccount, VerifyEmail, ResetPassword };
 
+    void showScreen(Screen next);
+    void submit();
+    void signIn();
+    void createAccount();
+    void verifyEmail();
+    void resetPassword();
+    void sendCode();
+    // Sends a sign-up code to pendingEmail and moves to the verify screen.
+    LocalAccounts::Result startVerification();
+    void showError(LocalAccounts::Result result);
+
+    Screen screen = Screen::SignIn;
     QLabel *heading;
+    QFormLayout *form;
     QLineEdit *email;
-    QLabel *displayNameLabel;
     QLineEdit *displayName;
-    QLabel *diningPlanLabel;
     QComboBox *diningPlan;
+    QLabel *passwordLabel;
     QLineEdit *password;
-    QLabel *confirmationLabel;
     QLineEdit *confirmation;
+    QLineEdit *code;
     QLabel *message;
     QPushButton *submitButton;
     QPushButton *switchButton;
-    bool creatingAccount = false;
+    QPushButton *codeButton;
+    QPushButton *forgotButton;
+    // Kept while the email is being verified, to sign in once it is.
+    QString pendingEmail;
+    QString pendingPassword;
     LocalAccounts::Profile signedInProfile;
 };
 
