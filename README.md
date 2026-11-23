@@ -18,23 +18,38 @@ See [REQUIREMENTS.md](REQUIREMENTS.md) for its scope and acceptance criteria, an
 2. Select a Qt 6 desktop kit with a matching C++17 compiler.
 3. Click **Run**.
 
-## Build and test from a terminal
+## Build, test, and run from a terminal
+
+Run these commands from the repository root. Each block installs the
+dependencies (CMake, a C++17 compiler, and Qt 6), then builds the project, runs
+the tests, and launches the app.
+
+### macOS (Homebrew)
 
 ```sh
+brew install cmake qt
+cmake -S . -B build -DCMAKE_PREFIX_PATH="$(brew --prefix qt)"
+cmake --build build
+ctest --test-dir build --output-on-failure
+./build/app
+```
+
+### Ubuntu / Linux
+
+```sh
+sudo apt-get update
+sudo apt-get install -y build-essential cmake qt6-base-dev libqt6sql6-sqlite
 cmake -S . -B build
 cmake --build build
 ctest --test-dir build --output-on-failure
+./build/app
 ```
 
-Install CMake 3.16 or newer, a C++17 compiler, and Qt 6 with the Widgets and SQL
-modules. Run these commands from the repository root. The GitHub Actions workflow
-builds the application and runs the model tests on each push and pull request.
-
-Run `./build/app` on Linux or `./build/app.exe` on Windows. Add Qt's `bin` directory
-to `PATH` before launching from a terminal. If CMake cannot find Qt, add
-`-DCMAKE_PREFIX_PATH=<your-Qt-kit-directory>` to the configure command.
-
 ### Windows with the installed Qt MinGW kit
+
+First install Qt 6 with the **MinGW 64-bit** kit, **MinGW** compiler, **CMake**,
+and **Ninja** using the [Qt Online Installer](https://www.qt.io/download-qt-installer).
+Then run:
 
 ```powershell
 $env:PATH = "C:\Qt\Tools\mingw1310_64\bin;C:\Qt\6.12.0\mingw_64\bin;C:\Qt\Tools\Ninja;" + $env:PATH
@@ -82,9 +97,8 @@ they accept, each of you can see the other's display name and balance.
 The amount field accepts numbers from 0 to 1,000,000 with two decimal places.
 It has no `points` suffix. Enter a new amount before each action. A blank amount
 or a purchase larger than the balance displays an error and leaves the balance
-unchanged. Balances are kept to two decimal places. Remaining days starts at 77 for a new account, goes down by one each day (including
-while the app is open), and can be set from 0 to 90; larger values are rejected and
-the previous count is kept. **Reset days** sets it back to 77.
+unchanged. Remaining days starts at 70 and can be set from 0 to 90, including
+today. Entering more than 90 shows an error and keeps the previous day count.
 
 For example, 700 points over 70 days recommends 10 points per day and 70 per week.
 With fewer than 7 days left, the weekly recommendation equals the remaining balance.
