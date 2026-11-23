@@ -109,10 +109,19 @@ ctest --test-dir build --output-on-failure
 
 CMake discovers every `tests/*.cpp` file and builds them into `test_build`.
 `tests/test_main.cpp` supplies the doctest entry point. Add other tests as separate
-files without another `DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN` definition, and put
-your name in a comment in your contribution.
+files without another `DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN` definition. Model tests
+are grouped by class and kind; add new ones to the matching file and put your name
+in an `// Author:` comment above each test you write:
 
-`tests/Spec_test.cpp` checks each test case in [SPECIFICATIONS.md](SPECIFICATIONS.md).
+| File | Covers |
+| --- | --- |
+| `tests/balance_happy_test.cpp` | Setting, adding and spending valid amounts |
+| `tests/balance_edge_test.cpp` | Zero amounts, rejected amounts, two-decimal rounding |
+| `tests/budget_happy_test.cpp` | Daily and weekly advice for a normal number of days |
+| `tests/budget_edge_test.cpp` | 0 and 90 day limits, fewer than 7 days, rejected day counts |
+
+Each test case in [SPECIFICATIONS.md](SPECIFICATIONS.md) has a test whose name
+starts with its ID (for example `SP-03:`).
 
 `tests/ui/*.cpp` build into a second binary, `ui_tests`, which runs with a
 `QApplication` (offscreen in CTest). It covers the Budget and Purchases tabs, the

@@ -1,9 +1,24 @@
+// Budget edge-case tests: the 0 and 90 day boundaries, fewer than seven days left,
+// and rejected day counts. A rejected count must leave the previous one unchanged.
+
 #include "doctest.h"
 
 #include <stdexcept>
 
 #include "balance.h"
 #include "budget.h"
+
+// From SPECIFICATIONS.md
+TEST_CASE("SP-04: 0, 1 and 90 remaining days are accepted") {
+    Balance balance(700);
+    Budget budget(balance, 70);
+    for (int days : {0, 1, 90}) {
+        CAPTURE(days);
+        CHECK_NOTHROW(budget.setRemainingDays(days));
+        CHECK(budget.getRemainingDays() == days);
+    }
+    CHECK(budget.getDailyBudget() == doctest::Approx(700.0 / 90));
+}
 
 TEST_CASE("Zero remaining days recommends the full balance without spending points") {
     Balance balance(700.0);
@@ -52,4 +67,13 @@ TEST_CASE("Negative remaining days are rejected and preserve the previous count"
     Budget budget(balance, 0);
     CHECK_THROWS_AS(budget.setRemainingDays(-1), std::invalid_argument);
     CHECK(budget.getRemainingDays() == 0);
+}
+
+// Author: Nathan Jeong
+TEST_CASE("Remaining days cannot exceed 90") {
+    Balance balance(500.0);
+    Budget budget(balance, 30);
+
+    CHECK_THROWS_AS(budget.setRemainingDays(91), std::invalid_argument);
+    CHECK(budget.getRemainingDays() == 30);
 }
