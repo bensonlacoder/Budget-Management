@@ -1,5 +1,6 @@
 #include "authdialog.h"
 
+#include <QAction>
 #include <QComboBox>
 #include <QFont>
 #include <QFormLayout>
@@ -8,6 +9,9 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QLocale>
+#include <QPainter>
+#include <QPainterPath>
+#include <QPixmap>
 #include <QPushButton>
 #include <QVBoxLayout>
 
@@ -21,6 +25,43 @@ struct BusyCursor {
     BusyCursor(const BusyCursor &) = delete;
     BusyCursor &operator=(const BusyCursor &) = delete;
 };
+
+// An eye drawn in the text color, crossed out when `crossed` is set. Qt has no
+// built-in eye icon, so it is painted here.
+QIcon eyeIcon(const QColor &color, bool crossed) {
+    constexpr int size = 64;
+    QPixmap pixmap(size, size);
+    pixmap.fill(Qt::transparent);
+    QPainter painter(&pixmap);
+    painter.setRenderHint(QPainter::Antialiasing);
+    painter.setPen(QPen(color, 5, Qt::SolidLine, Qt::RoundCap));
+    QPainterPath outline;
+    outline.moveTo(6, 32);
+    outline.quadTo(32, 4, 58, 32);
+    outline.quadTo(32, 60, 6, 32);
+    painter.drawPath(outline);
+    painter.setBrush(color);
+    painter.drawEllipse(QPointF(32, 32), 8, 8);
+    if (crossed) {
+        painter.drawLine(12, 52, 52, 12);
+    }
+    return QIcon(pixmap);
+}
+
+// Adds an eye button to the end of a password field that shows or hides what was typed.
+QAction *addRevealButton(QLineEdit *field) {
+    const QColor color = field->palette().color(QPalette::Text);
+    auto *reveal = field->addAction(eyeIcon(color, false), QLineEdit::TrailingPosition);
+    reveal->setObjectName(field->objectName() + "Reveal");
+    reveal->setCheckable(true);
+    reveal->setToolTip(QObject::tr("Show password"));
+    QObject::connect(reveal, &QAction::toggled, field, [field, reveal, color](bool shown) {
+        field->setEchoMode(shown ? QLineEdit::Normal : QLineEdit::Password);
+        reveal->setIcon(eyeIcon(color, shown));
+        reveal->setToolTip(shown ? QObject::tr("Hide password") : QObject::tr("Show password"));
+    });
+    return reveal;
+}
 }
 
 AuthDialog::AuthDialog(QWidget *parent)
@@ -40,7 +81,7 @@ AuthDialog::AuthDialog(QWidget *parent)
     heading->setFont(headingFont);
 
     email->setObjectName("emailEdit");
-    email->setPlaceholderText(tr("you@scu.edu"));
+    email->setPlaceholderText(tr("BBronco@scu.edu"));
     email->setMaxLength(LocalAccounts::MaxEmailLength);
     displayName->setObjectName("displayNameEdit");
     displayName->setPlaceholderText(tr("Visible to friends"));
@@ -55,6 +96,8 @@ AuthDialog::AuthDialog(QWidget *parent)
     confirmation->setObjectName("confirmationEdit");
     password->setEchoMode(QLineEdit::Password);
     confirmation->setEchoMode(QLineEdit::Password);
+    revealPassword = addRevealButton(password);
+    revealConfirmation = addRevealButton(confirmation);
     passwordLabel->setBuddy(password);
     code->setObjectName("codeEdit");
     code->setPlaceholderText(tr("6-digit code"));
@@ -151,6 +194,8 @@ void AuthDialog::showScreen(Screen next) {
     }
     password->clear();
     confirmation->clear();
+    revealPassword->setChecked(false); // Each screen starts with passwords hidden.
+    revealConfirmation->setChecked(false);
     code->clear();
     message->clear();
     (verifying ? code : email)->setFocus();
@@ -318,7 +363,7 @@ void AuthDialog::showError(Result result) {
     case Result::InvalidEmail:
         message->setText(screen == Screen::ResetPassword
                              ? tr("No account uses that email. Check it or create an account.")
-                             : tr("Enter a valid email address, such as you@scu.edu."));
+                             : tr("Enter a valid email address, such as BBronco@scu.edu."));
         email->setFocus();
         break;
     case Result::InvalidDisplayName:

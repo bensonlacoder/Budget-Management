@@ -5,6 +5,7 @@
 
 #include <QDialog>
 
+class QAction;
 class QComboBox;
 class QFormLayout;
 class QLabel;
@@ -46,6 +47,8 @@ private:
     QLabel *passwordLabel;
     QLineEdit *password;
     QLineEdit *confirmation;
+    QAction *revealPassword;
+    QAction *revealConfirmation;
     QLineEdit *code;
     QLabel *message;
     QPushButton *submitButton;

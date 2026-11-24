@@ -7,6 +7,7 @@
 #include "doctest.h"
 #include "test_account_store.h"
 
+#include <QAction>
 #include <QComboBox>
 #include <QLabel>
 #include <QLineEdit>
@@ -66,7 +67,7 @@ TEST_CASE("Creating an account sends a code, and the account is ready once it's 
     }
 
     form.createAccount("not-an-email");
-    CHECK(form.message->text() == "Enter a valid email address, such as you@scu.edu.");
+    CHECK(form.message->text() == "Enter a valid email address, such as BBronco@scu.edu.");
     CHECK_FALSE(form.accepted());
 
     form.createAccount("  Nathan@SCU.edu ");
@@ -181,4 +182,32 @@ TEST_CASE("A forgotten password is reset from the sign-in screen") {
     form.password->setText("new-password");
     form.submit->click();
     REQUIRE(form.accepted());
+}
+
+// Author: Nathan Gu
+TEST_CASE("The eye button shows and hides each password, and new screens start hidden") {
+    TestAccountStore store;
+    AuthDialog dialog;
+    AuthForm form(dialog);
+    auto *revealPassword = dialog.findChild<QAction *>("passwordEditReveal");
+    auto *revealConfirmation = dialog.findChild<QAction *>("confirmationEditReveal");
+    REQUIRE(revealPassword);
+    REQUIRE(revealConfirmation);
+    CHECK(form.password->echoMode() == QLineEdit::Password);
+
+    revealPassword->trigger();
+    CHECK(form.password->echoMode() == QLineEdit::Normal);
+    CHECK(form.confirmation->echoMode() == QLineEdit::Password); // Each field has its own.
+    revealPassword->trigger();
+    CHECK(form.password->echoMode() == QLineEdit::Password);
+
+    form.toggle->click(); // To Create account.
+    revealPassword->trigger();
+    revealConfirmation->trigger();
+    CHECK(form.password->echoMode() == QLineEdit::Normal);
+    CHECK(form.confirmation->echoMode() == QLineEdit::Normal);
+    form.toggle->click(); // Back to Sign in hides them again.
+    CHECK(form.password->echoMode() == QLineEdit::Password);
+    CHECK(form.confirmation->echoMode() == QLineEdit::Password);
+    CHECK_FALSE(revealPassword->isChecked());
 }
