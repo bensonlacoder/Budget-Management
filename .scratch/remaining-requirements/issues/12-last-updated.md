@@ -10,9 +10,9 @@
 
 **Blocked by:** 01 (SQLite storage)
 
-**Status:** ready-for-agent
+**Status:** done (branch `p1-storage`); P2 shows `Profile::lastUpdated` on the Profile page
 
-- [ ] Purchases, refunds, edits, removals, and balance corrections each save a last-updated timestamp when they succeed
-- [ ] A failed or rejected change leaves the timestamp unchanged
-- [ ] A storage function returns the timestamp, for the Profile page to display
-- [ ] Tests cover the timestamp changing on success and staying the same on failure
+- [x] Purchases, refunds, edits, removals, and balance corrections each save a last-updated timestamp when they succeed
+- [x] A failed or rejected change leaves the timestamp unchanged
+- [x] A storage function returns the timestamp, for the Profile page to display
+- [x] Tests cover the timestamp changing on success and staying the same on failure

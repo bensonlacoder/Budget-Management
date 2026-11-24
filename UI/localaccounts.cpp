@@ -1,5 +1,7 @@
 #include "localaccounts.h"
+#include "emailsender.h"
 
+#include <QCryptographicHash>
 #include <QDir>
 #include <QFileInfo>
 #include <QPasswordDigestor>
@@ -26,7 +28,7 @@ constexpr int HASH_ITERATIONS = 600000;
 constexpr int FRIEND_ID_LENGTH = 12;
 // Wait this long if another window of the app is writing the database.
 constexpr int BUSY_TIMEOUT_MS = 3000;
-constexpr int SCHEMA_VERSION = 2;
+constexpr int SCHEMA_VERSION = 3;
 const QString CONNECTION = QStringLiteral("dining-points-budget");
 
 // ---- Points are stored as whole cents so comparisons are exact. ----
@@ -135,22 +137,38 @@ bool createSchema(QSqlDatabase &db) {
         " PRIMARY KEY (account_id, section))",
         "CREATE INDEX IF NOT EXISTS purchases_by_account ON purchases(account_id)",
         "CREATE INDEX IF NOT EXISTS refunds_by_purchase ON refunds(purchase_id)",
+        // Version 3: sign-up verification and password reset codes (T15).
+        "CREATE TABLE IF NOT EXISTS email_codes ("
+        " account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,"
+        " purpose TEXT NOT NULL,"
+        " salt TEXT NOT NULL,"
+        " hash TEXT NOT NULL,"
+        " expires_at TEXT NOT NULL,"
+        " attempts INTEGER NOT NULL DEFAULT 0,"
+        " PRIMARY KEY (account_id, purpose))",
     };
     QSqlQuery query(db);
     if (!query.exec(QStringLiteral("PRAGMA busy_timeout = %1").arg(BUSY_TIMEOUT_MS))
         || !query.exec(QStringLiteral("PRAGMA user_version")) || !query.next()) {
         return false;
     }
+    const int version = query.value(0).toInt();
     // Version 1 ordered history by save time in milliseconds, which ties when entries
     // are saved within the same millisecond. Version 2 uses a shared sequence instead;
     // the old values are still increasing, so they are kept as sequence numbers.
-    if (query.value(0).toInt() == 1) {
+    if (version == 1) {
         for (const char *table : {"purchases", "refunds", "corrections"}) {
             if (!query.exec(QStringLiteral("ALTER TABLE %1 RENAME COLUMN created_ms TO seq")
                                 .arg(QLatin1String(table)))) {
                 return false;
             }
         }
+    }
+    // Version 3 requires a verified email to sign in. Accounts made before then had no
+    // way to verify, so they count as verified rather than being locked out.
+    if (version >= 1 && version < 3
+        && !query.exec(QStringLiteral("UPDATE accounts SET email_verified = 1"))) {
+        return false;
     }
     for (const char *statement : statements) {
         if (!query.exec(QString::fromLatin1(statement))) {
@@ -271,6 +289,13 @@ constexpr auto PROFILE_COLUMNS =
     "id, email, display_name, friend_id, dining_plan, balance_cents, remaining_days,"
     " days_counted_on, days_corrected, last_updated";
 
+// Last-updated times are saved in UTC (ISO 8601 with milliseconds) and returned in
+// local time. Returns an invalid QDateTime for a missing or empty value.
+QDateTime lastUpdatedFrom(const QVariant &value) {
+    const QDateTime saved = QDateTime::fromString(value.toString(), Qt::ISODateWithMs);
+    return saved.isValid() ? saved.toLocalTime() : QDateTime();
+}
+
 // Reads a row selected with PROFILE_COLUMNS.
 LocalAccounts::Profile profileFrom(const QSqlQuery &row) {
     LocalAccounts::Profile profile;
@@ -284,7 +309,7 @@ LocalAccounts::Profile profileFrom(const QSqlQuery &row) {
         row.value(6).toInt(), QDate::fromString(row.value(7).toString(), Qt::ISODate),
         QDate::currentDate());
     profile.daysCorrected = row.value(8).toBool();
-    profile.lastUpdated = QDateTime::fromString(row.value(9).toString(), Qt::ISODateWithMs);
+    profile.lastUpdated = lastUpdatedFrom(row.value(9));
     return profile;
 }
 
@@ -310,10 +335,14 @@ bool balanceOf(QSqlDatabase &db, const QString &account, qint64 &cents) {
     return true;
 }
 
+// Saves the balance and records now as the last-updated time (T12). Every successful
+// change to the balance or history ends here, including edits that leave the amount
+// the same; a failed change rolls back with its transaction, timestamp included.
 bool setBalance(QSqlDatabase &db, const QString &account, qint64 cents) {
     QSqlQuery query(db);
-    return run(query, QStringLiteral("UPDATE accounts SET balance_cents = ? WHERE id = ?"),
-               {cents, account});
+    return run(query, QStringLiteral("UPDATE accounts SET balance_cents = ?, last_updated = ?"
+                                     " WHERE id = ?"),
+               {cents, QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs), account});
 }
 
 // Adds `change` cents to the balance. Returns InsufficientPoints if it would go negative.
@@ -480,11 +509,17 @@ Result create(const QString &email, const QString &password, const QString &disp
         return Result::StorageError;
     }
     return inTransaction([&](QSqlDatabase &db) {
-        if (exists(db, QStringLiteral("SELECT 1 FROM accounts WHERE email = ?"), {address})) {
+        if (exists(db, QStringLiteral("SELECT 1 FROM accounts WHERE email = ? AND email_verified = 1"),
+                   {address})) {
             return Result::EmailTaken;
         }
-        const QString id = newId();
         QSqlQuery query(db);
+        // An earlier sign-up that was never verified gives way to this one.
+        if (!run(query, QStringLiteral("DELETE FROM accounts WHERE email = ? AND email_verified = 0"),
+                 {address})) {
+            return Result::StorageError;
+        }
+        const QString id = newId();
         if (!run(query, QStringLiteral(
                      "INSERT INTO accounts (id, email, salt, hash, display_name, friend_id,"
                      " dining_plan, balance_cents, remaining_days, days_counted_on)"
@@ -504,7 +539,8 @@ Result signIn(const QString &email, const QString &password, Profile &profile) {
         return Result::StorageError;
     }
     QSqlQuery query(db);
-    if (!run(query, QStringLiteral("SELECT id, salt, hash, balance_cents FROM accounts WHERE email = ?"),
+    if (!run(query, QStringLiteral("SELECT id, salt, hash, balance_cents, email_verified"
+                                   " FROM accounts WHERE email = ?"),
              {normalizedEmail(email)})) {
         return Result::StorageError;
     }
@@ -517,6 +553,9 @@ Result signIn(const QString &email, const QString &password, Profile &profile) {
     // A damaged balance would make Balance throw when the window opens.
     if (query.value(3).toLongLong() < 0) {
         return Result::StorageError;
+    }
+    if (!query.value(4).toBool()) {
+        return Result::EmailNotVerified;
     }
     return selectProfile(db, query.value(0).toString(), profile) ? Result::Success
                                                                  : Result::StorageError;
@@ -966,9 +1005,17 @@ bool loadHistory(const QString &account, QList<HistoryEntry> &history) {
     return true;
 }
 
-bool loadLastUpdated(const QString &, QDateTime &lastUpdated) {
+bool loadLastUpdated(const QString &account, QDateTime &lastUpdated) {
     lastUpdated = {};
-    return false;
+    return reading([&](QSqlDatabase &db) {
+        QSqlQuery query(db);
+        if (!run(query, QStringLiteral("SELECT last_updated FROM accounts WHERE id = ?"), {account})
+            || !query.next()) {
+            return false;
+        }
+        lastUpdated = lastUpdatedFrom(query.value(0));
+        return true;
+    });
 }
 
 // ---- Plan tab ----
@@ -1172,21 +1219,178 @@ Result removeSection(const QString &account, const QString &section) {
     });
 }
 
-// ---- Email codes: stubs until T15 ----
+// ---- Email codes ----
 
-Result sendVerificationCode(const QString &) {
-    return Result::StorageError;
+namespace {
+constexpr int CODE_DIGITS = 6;
+const QString VERIFY = QStringLiteral("verify");
+const QString RESET = QStringLiteral("reset");
+
+QByteArray codeHash(const QString &code, const QByteArray &salt) {
+    return QCryptographicHash::hash(salt + code.toUtf8(), QCryptographicHash::Sha256);
 }
 
-Result verifyEmail(const QString &, const QString &) {
-    return Result::StorageError;
+// Finds an account by email. Returns false if there is none.
+bool accountByEmail(QSqlDatabase &db, const QString &email, QString &account, bool &verified) {
+    QSqlQuery query(db);
+    if (!run(query, QStringLiteral("SELECT id, email_verified FROM accounts WHERE email = ?"),
+             {normalizedEmail(email)})
+        || !query.next()) {
+        return false;
+    }
+    account = query.value(0).toString();
+    verified = query.value(1).toBool();
+    return true;
 }
 
-Result sendPasswordResetCode(const QString &) {
-    return Result::StorageError;
+// Stores a new code for `purpose`, replacing any earlier one, then emails it. The code
+// is removed again if the email can't be sent.
+//   verify: for unverified accounts; an already verified one needs nothing (Success).
+//   reset:  for verified accounts; an unverified one gives EmailNotVerified.
+Result issueCode(const QString &email, const QString &purpose) {
+    const QString code = QStringLiteral("%1").arg(
+        QRandomGenerator::system()->bounded(1000000), CODE_DIGITS, 10, QLatin1Char('0'));
+    const QByteArray salt = newSalt();
+    QString account;
+    bool nothingToDo = false;
+    const Result stored = inTransaction([&](QSqlDatabase &db) {
+        bool verified = false;
+        if (!accountByEmail(db, email, account, verified)) {
+            return Result::InvalidEmail;
+        }
+        if (purpose == VERIFY && verified) {
+            nothingToDo = true;
+            return Result::Success;
+        }
+        if (purpose == RESET && !verified) {
+            return Result::EmailNotVerified;
+        }
+        const QString expires = QDateTime::currentDateTimeUtc()
+                                    .addSecs(LocalAccounts::CodeLifetimeMinutes * 60)
+                                    .toString(Qt::ISODateWithMs);
+        QSqlQuery query(db);
+        return run(query, QStringLiteral("INSERT OR REPLACE INTO email_codes (account_id, purpose, salt,"
+                                         " hash, expires_at, attempts) VALUES (?, ?, ?, ?, ?, 0)"),
+                   {account, purpose, QString::fromLatin1(salt.toHex()),
+                    QString::fromLatin1(codeHash(code, salt).toHex()), expires})
+            ? Result::Success
+            : Result::StorageError;
+    });
+    if (stored != Result::Success || nothingToDo) {
+        return stored;
+    }
+    const auto kind = purpose == RESET ? EmailSender::Purpose::PasswordReset
+                                       : EmailSender::Purpose::Verification;
+    if (EmailSender::send(normalizedEmail(email), code, kind)) {
+        return Result::Success;
+    }
+    inTransaction([&](QSqlDatabase &db) {
+        QSqlQuery query(db);
+        return run(query, QStringLiteral("DELETE FROM email_codes WHERE account_id = ? AND purpose = ?"),
+                   {account, purpose})
+            ? Result::Success
+            : Result::StorageError;
+    });
+    return Result::CodeNotSent;
 }
 
-Result resetPassword(const QString &, const QString &, const QString &) {
-    return Result::StorageError;
+// Checks a code inside a transaction. On success the code is used up; a wrong code
+// counts an attempt, and the last allowed attempt cancels the code.
+Result checkCode(QSqlDatabase &db, const QString &account, const QString &purpose,
+                 const QString &code) {
+    QSqlQuery query(db);
+    if (!run(query, QStringLiteral("SELECT salt, hash, expires_at, attempts FROM email_codes"
+                                   " WHERE account_id = ? AND purpose = ?"), {account, purpose})) {
+        return Result::StorageError;
+    }
+    if (!query.next()) {
+        return Result::InvalidCode;
+    }
+    const QByteArray salt = QByteArray::fromHex(query.value(0).toString().toLatin1());
+    const QByteArray hash = QByteArray::fromHex(query.value(1).toString().toLatin1());
+    const QDateTime expires = QDateTime::fromString(query.value(2).toString(), Qt::ISODateWithMs);
+    const int attempts = query.value(3).toInt();
+    if (!expires.isValid() || QDateTime::currentDateTimeUtc() > expires) {
+        return Result::CodeExpired;
+    }
+    if (!hashesMatch(hash, codeHash(code.trimmed(), salt))) {
+        const bool lastTry = attempts + 1 >= LocalAccounts::MaxCodeAttempts;
+        const bool saved = lastTry
+            ? run(query, QStringLiteral("DELETE FROM email_codes WHERE account_id = ? AND purpose = ?"),
+                  {account, purpose})
+            : run(query, QStringLiteral("UPDATE email_codes SET attempts = attempts + 1"
+                                        " WHERE account_id = ? AND purpose = ?"), {account, purpose});
+        return saved ? Result::InvalidCode : Result::StorageError;
+    }
+    return run(query, QStringLiteral("DELETE FROM email_codes WHERE account_id = ? AND purpose = ?"),
+               {account, purpose})
+        ? Result::Success
+        : Result::StorageError;
+}
+
+// Runs `onSuccess` in the same transaction as a successful code check. A wrong code's
+// attempt count must be saved even though the check failed, so it commits separately.
+template <typename OnSuccess>
+Result useCode(const QString &email, const QString &purpose, const QString &code,
+               OnSuccess onSuccess) {
+    Result checked = Result::StorageError;
+    const Result result = inTransaction([&](QSqlDatabase &db) {
+        QString account;
+        bool verified = false;
+        if (!accountByEmail(db, email, account, verified)) {
+            checked = Result::InvalidEmail;
+            return Result::Success;
+        }
+        checked = checkCode(db, account, purpose, code);
+        if (checked != Result::Success) {
+            return Result::Success; // Keep the attempt count.
+        }
+        return onSuccess(db, account);
+    });
+    return result == Result::Success ? checked : result;
+}
+}
+
+Result sendVerificationCode(const QString &email) {
+    return issueCode(email, VERIFY);
+}
+
+Result verifyEmail(const QString &email, const QString &code) {
+    return useCode(email, VERIFY, code, [](QSqlDatabase &db, const QString &account) {
+        QSqlQuery query(db);
+        return run(query, QStringLiteral("UPDATE accounts SET email_verified = 1 WHERE id = ?"), {account})
+            ? Result::Success
+            : Result::StorageError;
+    });
+}
+
+void cancelSignUp(const QString &email) {
+    inTransaction([&](QSqlDatabase &db) {
+        QSqlQuery query(db);
+        return run(query, QStringLiteral("DELETE FROM accounts WHERE email = ? AND email_verified = 0"),
+                   {normalizedEmail(email)})
+            ? Result::Success
+            : Result::StorageError;
+    });
+}
+
+Result sendPasswordResetCode(const QString &email) {
+    return issueCode(email, RESET);
+}
+
+Result resetPassword(const QString &email, const QString &code, const QString &newPassword) {
+    if (newPassword.size() < MinPasswordLength) {
+        return Result::ShortPassword;
+    }
+    // Hash before the transaction so the database isn't locked while it runs.
+    const QByteArray salt = newSalt();
+    const QByteArray hash = deriveHash(newPassword, salt);
+    return useCode(email, RESET, code, [&](QSqlDatabase &db, const QString &account) {
+        QSqlQuery query(db);
+        return run(query, QStringLiteral("UPDATE accounts SET salt = ?, hash = ? WHERE id = ?"),
+                   {QString::fromLatin1(salt.toHex()), QString::fromLatin1(hash.toHex()), account})
+            ? Result::Success
+            : Result::StorageError;
+    });
 }
 }

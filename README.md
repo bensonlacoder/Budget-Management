@@ -68,9 +68,16 @@ compiler, choose a new build directory in all commands.
 ### Sign in
 
 Create an account with your email address, a display name (up to 32 characters), a
-quarter dining plan and a password of at least 8 characters, then sign in with your
-email and password. Upper and lower case in the email don't matter. Your balance
-starts at the plan's points. Use **Account > Sign out** to switch accounts.
+quarter dining plan and a password of at least 8 characters. The app emails you a
+6-digit code; enter it to finish creating the account. Then sign in with your email
+and password; upper and lower case in the email don't matter. Your balance starts at
+the plan's points. Use **Account > Sign out** to switch accounts.
+
+- **Resend code** sends a new code and cancels the old one. Codes expire after 15
+  minutes, and 5 wrong tries cancel a code.
+- Signing in before verifying sends a new code first.
+- **Forgot password?** on the sign-in screen emails a code for setting a new password.
+- Sending codes needs the email sender set up; see [Email codes](#email-codes).
 
 ### Purchases tab
 
@@ -84,6 +91,16 @@ Opening hours are fetched from the SCU dining site when available.
 
 **Account > Friends** shows your friend ID. Send a request with a friend's ID; once
 they accept, each of you can see the other's display name and balance.
+
+### Find meals
+
+**Menus > Find meals** lists every menu item, or size or option, that costs at most
+the points you enter, cheapest first, with its location. Choose a location to see
+only its items. Items priced at the receipt total aren't listed; a note says how
+many were left out. Select a meal and choose **Save this section** to keep its
+location for quick access; **Show items** jumps back to a saved section and
+**Remove** deletes it. Saved sections are kept with your account. Prices come from
+the dated reference menu.
 
 ### Budget tab
 
@@ -105,6 +122,41 @@ down to the nearest hundredth so following them never spends more than the balan
 
 For example, 700 points over 70 days recommends 10 points per day and 70 per week.
 With fewer than 7 days left, the weekly recommendation equals the remaining balance.
+
+## Email codes
+
+The app sends sign-up and password reset codes through a Google Apps Script web app,
+[apps-script/send-code.gs](apps-script/send-code.gs), running on a Gmail account
+used only for this app. Without it, creating an account shows "Couldn't send the
+code. Try again." Tests never send email; they use a fake sender.
+
+**Set it up once (the team's sender account):**
+
+1. Create a new Gmail account for the app. Don't use an SCU or personal account.
+2. Signed in as that account, open [script.google.com](https://script.google.com),
+   choose **New project**, and replace the contents of `Code.gs` with
+   `apps-script/send-code.gs`. Save.
+3. Choose a long random secret, for example the output of
+   `python -c "import secrets; print(secrets.token_urlsafe(32))"`. In **Project
+   Settings > Script properties**, add a property named `SHARED_SECRET` with that
+   value. The secret is never written in the script or the repository.
+4. Choose **Deploy > New deployment**, select type **Web app**, set **Execute as** to
+   *Me* and **Who has access** to *Anyone*, then **Deploy**. Google asks you to
+   authorize sending email as that account; allow it. Copy the **Web app URL**
+   (it ends in `/exec`). *Anyone* is needed because the desktop app doesn't sign in to
+   Google; the shared secret is what stops others from using it.
+5. After editing the script later, use **Deploy > Manage deployments > Edit > New
+   version** so the URL stays the same.
+
+**On each computer that runs the app:** copy
+[email-sender.example.ini](email-sender.example.ini) to `email-sender.ini` in the
+app's data folder (on Windows, `%LOCALAPPDATA%\DiningPointsBudget\email-sender.ini`),
+or point the `DINING_POINTS_EMAIL_CONFIG` environment variable at it, and fill in the
+URL and secret. `email-sender.ini` is in `.gitignore`: never commit it, and share the
+secret with teammates privately.
+
+The script sends at most 5 emails per address per hour, and Apps Script lets a Gmail
+account send about 100 emails a day.
 
 ## Scope and limitations
 
@@ -163,7 +215,9 @@ again to confirm a passing run. Keep the submitted application branch passing.
 - `UI/mainui.h` and `UI/mainui.cpp`: connect user actions to the models and update the display.
 - `UI/mainui.ui`: define the layout; edit it in Qt Designer.
 - `UI/main.cpp`: show sign-in, then build the main window, tabs and Account menu.
-- `UI/authdialog.*`: sign in or create an account.
+- `UI/authdialog.*`: sign in, create an account, verify its email, or reset a password.
+- `UI/emailsender.*`: send codes through the Apps Script web app (`apps-script/`).
+- `UI/menusearchdialog.*`: find meals within a point limit and keep saved menu sections.
 - `UI/localaccounts.*`: all saved data (accounts, balances, purchases, refunds,
   corrections, plan settings, friends, saved menu sections) in SQLite. Pages call only
   these functions and never open the database themselves.

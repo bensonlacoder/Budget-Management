@@ -10,7 +10,7 @@ Four people, one week. Tickets are in [issues/](issues/), numbered in dependency
 | **P2** | Profile, quarters, Budget tab | 00 (skeleton part) → 03 Quarter calendar → 02 Profile page → 04 Budget tab sandbox |
 | **P3** | Purchases and charts | 08 Filter and edit history → 09 Refunds → 10 Location totals and charts → 11 Budget vs. actual |
 | **P4** | Advice and friends | 06 Reserve goal → 07 Dining habits and suggestions → 05 Pending requests and remove friend → 13 Alerts |
-| Whoever finishes first | Menus | 14 Menu search and saved sections |
+| **Nathan Gu** (finished P1 first) | Menus | 14 Menu search and saved sections |
 | After the deadline | Backend | 16 Move to a hosted backend |
 
 ## Timeline

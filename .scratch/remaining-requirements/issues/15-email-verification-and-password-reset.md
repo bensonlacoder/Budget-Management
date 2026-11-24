@@ -10,13 +10,13 @@
 
 **Blocked by:** 01 (SQLite storage)
 
-**Status:** ready-for-agent
+**Status:** code done (branch `p1-storage`); deploying the Apps Script is a manual step in README "Email codes"
 
-- [ ] `apps-script/send-code.gs` accepts an email address, a code, and a shared secret, rejects requests with the wrong secret, and sends a short email. README explains how to deploy it
-- [ ] The web app URL and shared secret are read from a config file that is listed in `.gitignore`; the repo includes only an example file
-- [ ] At sign-up the app generates a code, stores only its hash with a 15-minute expiry, and sends it
-- [ ] The account can't sign in until the code is entered
-- [ ] **Resend code** sends a new code and invalidates the old one
-- [ ] "Forgot password?" sends a reset code, and the user can set a new password only with a valid code
-- [ ] If the sender can't be reached, the app shows "Couldn't send the code. Try again." and nothing is half-created
-- [ ] Tests use a fake sender (no real email) and cover a correct code, a wrong code, an expired code, and resending
+- [x] `apps-script/send-code.gs` accepts an email address, a code, and a shared secret, rejects requests with the wrong secret, and sends a short email. README explains how to deploy it
+- [x] The web app URL and shared secret are read from a config file that is listed in `.gitignore`; the repo includes only an example file
+- [x] At sign-up the app generates a code, stores only its hash with a 15-minute expiry, and sends it
+- [x] The account can't sign in until the code is entered
+- [x] **Resend code** sends a new code and invalidates the old one
+- [x] "Forgot password?" sends a reset code, and the user can set a new password only with a valid code
+- [x] If the sender can't be reached, the app shows "Couldn't send the code. Try again." and nothing is half-created
+- [x] Tests use a fake sender (no real email) and cover a correct code, a wrong code, an expired code, and resending

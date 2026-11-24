@@ -1,6 +1,7 @@
 #include "authdialog.h"
 #include "friendsdialog.h"
 #include "mainui.h"
+#include "menusearchdialog.h"
 #include "purchasespage.h"
 
 #include <QAction>
@@ -39,6 +40,13 @@ int main(int argc, char *argv[]) {
             auto *dialog = new FriendsDialog(accountName, friendId, window);
             dialog->setAttribute(Qt::WA_DeleteOnClose);
             dialog->setWindowModality(Qt::WindowModal);
+            dialog->show();
+        });
+        auto *menus = window->menuBar()->addMenu(QObject::tr("&Menus"));
+        auto *findMeals = menus->addAction(QObject::tr("&Find meals..."));
+        QObject::connect(findMeals, &QAction::triggered, window, [window, accountName] {
+            auto *dialog = new MenuSearchDialog(accountName, window);
+            dialog->setAttribute(Qt::WA_DeleteOnClose);
             dialog->show();
         });
         auto *signOut = accountMenu->addAction(QObject::tr("Sign &out"));

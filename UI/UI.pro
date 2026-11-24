@@ -8,10 +8,12 @@ SOURCES += \
     ../src/balance.cpp \
     ../src/budget.cpp \
     authdialog.cpp \
+    emailsender.cpp \
     friendsdialog.cpp \
     localaccounts.cpp \
     main.cpp \
     mainui.cpp \
+    menusearchdialog.cpp \
     purchasespage.cpp \
     lunchcatalog.cpp \
     scumenu.cpp
@@ -20,9 +22,11 @@ HEADERS += \
     ../src/balance.h \
     ../src/budget.h \
     authdialog.h \
+    emailsender.h \
     friendsdialog.h \
     localaccounts.h \
     mainui.h \
+    menusearchdialog.h \
     purchasespage.h \
     scumenu.h
 

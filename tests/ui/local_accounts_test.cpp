@@ -7,6 +7,7 @@
 #include "test_account_store.h"
 
 #include <QDir>
+#include <QRegularExpression>
 #include <QSqlDatabase>
 #include <QSqlQuery>
 #include <QStandardPaths>
@@ -18,11 +19,12 @@ using LocalAccounts::HistoryEntry;
 using LocalAccounts::Result;
 
 namespace {
+// Creates a verified account (password "correct-horse") in the running test's store.
 LocalAccounts::Profile createAccount(const QString &email, const QString &displayName,
                                      const QString &plan = "basic") {
-    LocalAccounts::Profile profile;
-    REQUIRE(LocalAccounts::create(email, "correct-horse", displayName, plan, profile)
-            == Result::Success);
+    REQUIRE(TestAccountStore::current());
+    const auto profile = TestAccountStore::current()->createVerified(email, displayName, plan);
+    REQUIRE_FALSE(profile.accountId.isEmpty());
     return profile;
 }
 
@@ -499,6 +501,127 @@ TEST_CASE("Removing a refund whose points were already spent is refused") {
     CHECK(balanceOf(buyer) == 0.0);
 }
 
+// ---- Last updated (T12) ----
+
+namespace {
+// Sets the saved last-updated time to an old value, so a test can tell whether the
+// next operation changed it.
+void markOld(const QString &account) {
+    const QString sql = QStringLiteral("UPDATE accounts SET last_updated = '2000-01-01T00:00:00.000Z'"
+                                       " WHERE id = '%1'").arg(account);
+    const QByteArray utf8 = sql.toUtf8();
+    tamper({utf8.constData()});
+}
+
+bool wasUpdated(const QString &account) {
+    QDateTime updated;
+    REQUIRE(LocalAccounts::loadLastUpdated(account, updated));
+    REQUIRE(updated.isValid());
+    return updated.date().year() > 2000;
+}
+}
+
+TEST_CASE("Last updated starts empty and records successful changes in local time") {
+    TestAccountStore store;
+    const auto account = createAccount("time@scu.edu", "Timer").accountId;
+    QDateTime updated = QDateTime::currentDateTime();
+    REQUIRE(LocalAccounts::loadLastUpdated(account, updated));
+    CHECK_FALSE(updated.isValid()); // Nothing has changed yet.
+    CHECK_FALSE(LocalAccounts::loadLastUpdated("nobody", updated));
+
+    // Saved with millisecond precision, so compare against times truncated to the second.
+    const QDateTime before = QDateTime::currentDateTime().addSecs(-1);
+    double balance = 0.0;
+    REQUIRE(LocalAccounts::recordPurchase(account, {QDate::currentDate(), "Marketplace", "", 1.0},
+                                          balance) == Result::Success);
+    const QDateTime after = QDateTime::currentDateTime().addSecs(1);
+    REQUIRE(LocalAccounts::loadLastUpdated(account, updated));
+    CHECK(updated >= before);
+    CHECK(updated <= after);
+    CHECK(updated.timeSpec() == Qt::LocalTime);
+
+    LocalAccounts::Profile profile;
+    REQUIRE(LocalAccounts::loadProfile(account, profile));
+    CHECK(profile.lastUpdated == updated);
+}
+
+TEST_CASE("Every successful balance or history change updates the time") {
+    TestAccountStore store;
+    const auto account = createAccount("every@scu.edu", "Everyone").accountId; // 2237
+    const QDate today = QDate::currentDate();
+    double balance = 0.0;
+    REQUIRE(LocalAccounts::recordPurchase(account, {today, "Marketplace", "Lunch", 10.0}, balance)
+            == Result::Success);
+    QList<LocalAccounts::Purchase> purchases;
+    REQUIRE(LocalAccounts::loadPurchases(account, purchases));
+    auto purchase = purchases.first();
+
+    SUBCASE("Recording a purchase") {
+        markOld(account);
+        REQUIRE(LocalAccounts::recordPurchase(account, {today, "Marketplace", "", 1.0}, balance)
+                == Result::Success);
+    }
+    SUBCASE("Editing a purchase, even without changing its points") {
+        purchase.location = "The Bronco";
+        markOld(account);
+        REQUIRE(LocalAccounts::editPurchase(account, purchase, balance) == Result::Success);
+    }
+    SUBCASE("Removing a purchase") {
+        markOld(account);
+        REQUIRE(LocalAccounts::removePurchase(account, purchase, balance) == Result::Success);
+    }
+    SUBCASE("Recording, editing and removing a refund") {
+        markOld(account);
+        REQUIRE(LocalAccounts::recordRefund(account, {today, 4.0, purchase.id}, balance)
+                == Result::Success);
+        CHECK(wasUpdated(account));
+        QList<HistoryEntry> history;
+        REQUIRE(LocalAccounts::loadHistory(account, history));
+        const QString refundId = history.first().id;
+        markOld(account);
+        REQUIRE(LocalAccounts::editRefund(account, {today, 5.0, purchase.id, {}, refundId}, balance)
+                == Result::Success);
+        CHECK(wasUpdated(account));
+        markOld(account);
+        REQUIRE(LocalAccounts::removeRefund(account, refundId, balance) == Result::Success);
+    }
+    SUBCASE("Correcting the balance") {
+        markOld(account);
+        REQUIRE(LocalAccounts::correctBalance(account, CorrectionMode::Add, 5.0, balance)
+                == Result::Success);
+    }
+    SUBCASE("Saving a balance from the Budget tab") {
+        markOld(account);
+        REQUIRE(LocalAccounts::saveBalance(account, 2227.0, 2000.0));
+    }
+    CHECK(wasUpdated(account));
+}
+
+TEST_CASE("Rejected or empty changes leave the time unchanged") {
+    TestAccountStore store;
+    const auto account = createAccount("still@scu.edu", "Still", "apartment").accountId; // 336
+    const QDate today = QDate::currentDate();
+    double balance = 0.0;
+    markOld(account);
+
+    CHECK(LocalAccounts::recordPurchase(account, {today, "Marketplace", "", 400.0}, balance)
+          == Result::InsufficientPoints);
+    CHECK(LocalAccounts::recordPurchase(account, {today, "", "", 1.0}, balance)
+          == Result::InvalidPurchase);
+    CHECK(LocalAccounts::correctBalance(account, CorrectionMode::Subtract, 400.0, balance)
+          == Result::InsufficientPoints);
+    // Setting the balance to its current value isn't a change.
+    CHECK(LocalAccounts::correctBalance(account, CorrectionMode::Set, 336.0, balance)
+          == Result::Success);
+    CHECK(LocalAccounts::recordRefund(account, {today, 1.0, "no-such-purchase"}, balance)
+          == Result::PurchaseUnavailable);
+    CHECK_FALSE(LocalAccounts::saveBalance(account, 1.0, 2.0)); // Stale previous balance.
+    // Settings and days corrections aren't balance or history changes.
+    CHECK(LocalAccounts::savePlanSettings(account, {}) == Result::Success);
+    CHECK(LocalAccounts::saveRemainingDays(account, 30));
+    CHECK_FALSE(wasUpdated(account));
+}
+
 // ---- Plan tab ----
 
 TEST_CASE("Plan settings are saved together and invalid values are refused") {
@@ -630,15 +753,180 @@ TEST_CASE("Menu sections can be saved once, listed and removed") {
     CHECK_FALSE(LocalAccounts::loadSavedSections("nobody", sections));
 }
 
-// ---- Not implemented yet ----
+// ---- Email codes (T15) ----
 
-TEST_CASE("T12 and T15 functions fail safely until those tickets implement them") {
+namespace {
+bool isSixDigits(const QString &code) {
+    return QRegularExpression(QRegularExpression::anchoredPattern("[0-9]{6}")).match(code).hasMatch();
+}
+
+LocalAccounts::Profile createUnverified(const QString &email, const QString &password = "correct-horse") {
+    LocalAccounts::Profile profile;
+    REQUIRE(LocalAccounts::create(email, password, "New", "basic", profile) == Result::Success);
+    return profile;
+}
+}
+
+TEST_CASE("A new account can't sign in until its email is verified") {
     TestAccountStore store;
-    const auto account = createAccount("later@scu.edu", "Later").accountId;
-    QDateTime updated = QDateTime::currentDateTime();
-    CHECK_FALSE(LocalAccounts::loadLastUpdated(account, updated));
-    CHECK_FALSE(updated.isValid());
-    CHECK(LocalAccounts::sendVerificationCode("later@scu.edu") == Result::StorageError);
-    CHECK(LocalAccounts::resetPassword("later@scu.edu", "123456", "new-password")
-          == Result::StorageError);
+    createUnverified("new@scu.edu");
+    LocalAccounts::Profile profile;
+    CHECK(LocalAccounts::signIn("new@scu.edu", "wrong-password", profile)
+          == Result::IncorrectCredentials);
+    CHECK(LocalAccounts::signIn("new@scu.edu", "correct-horse", profile)
+          == Result::EmailNotVerified);
+    // No code has been requested yet.
+    CHECK(LocalAccounts::verifyEmail("new@scu.edu", "123456") == Result::InvalidCode);
+
+    REQUIRE(LocalAccounts::sendVerificationCode(" NEW@scu.edu ") == Result::Success);
+    const QString code = store.sentCodes.value("new@scu.edu");
+    CHECK(isSixDigits(code));
+    const QString wrong = code == "000000" ? "111111" : "000000";
+    CHECK(LocalAccounts::verifyEmail("new@scu.edu", wrong) == Result::InvalidCode);
+    CHECK(LocalAccounts::verifyEmail("nobody@scu.edu", code) == Result::InvalidEmail);
+    REQUIRE(LocalAccounts::verifyEmail("new@scu.edu", " " + code + " ") == Result::Success);
+    CHECK(LocalAccounts::signIn("new@scu.edu", "correct-horse", profile) == Result::Success);
+
+    // A used code can't be used again, and a verified account needs no more codes.
+    CHECK(LocalAccounts::verifyEmail("new@scu.edu", code) == Result::InvalidCode);
+    const int sent = store.emailsSent;
+    CHECK(LocalAccounts::sendVerificationCode("new@scu.edu") == Result::Success);
+    CHECK(store.emailsSent == sent);
+    CHECK(LocalAccounts::sendVerificationCode("nobody@scu.edu") == Result::InvalidEmail);
+}
+
+TEST_CASE("Resending a code cancels the previous one") {
+    TestAccountStore store;
+    createUnverified("resend@scu.edu");
+    REQUIRE(LocalAccounts::sendVerificationCode("resend@scu.edu") == Result::Success);
+    const QString first = store.sentCodes.value("resend@scu.edu");
+    QString second = first;
+    // Codes are random; resend until a different one arrives (almost always at once).
+    for (int tries = 0; second == first && tries < 5; ++tries) {
+        REQUIRE(LocalAccounts::sendVerificationCode("resend@scu.edu") == Result::Success);
+        second = store.sentCodes.value("resend@scu.edu");
+    }
+    REQUIRE(second != first);
+    CHECK(LocalAccounts::verifyEmail("resend@scu.edu", first) == Result::InvalidCode);
+    CHECK(LocalAccounts::verifyEmail("resend@scu.edu", second) == Result::Success);
+}
+
+TEST_CASE("Expired codes are refused") {
+    TestAccountStore store;
+    createUnverified("late@scu.edu");
+    REQUIRE(LocalAccounts::sendVerificationCode("late@scu.edu") == Result::Success);
+    const QString code = store.sentCodes.value("late@scu.edu");
+    tamper({"UPDATE email_codes SET expires_at = '2000-01-01T00:00:00.000Z'"});
+    CHECK(LocalAccounts::verifyEmail("late@scu.edu", code) == Result::CodeExpired);
+    // A new code works.
+    REQUIRE(LocalAccounts::sendVerificationCode("late@scu.edu") == Result::Success);
+    CHECK(LocalAccounts::verifyEmail("late@scu.edu", store.sentCodes.value("late@scu.edu"))
+          == Result::Success);
+}
+
+TEST_CASE("Too many wrong codes cancel the code") {
+    TestAccountStore store;
+    createUnverified("guess@scu.edu");
+    REQUIRE(LocalAccounts::sendVerificationCode("guess@scu.edu") == Result::Success);
+    const QString code = store.sentCodes.value("guess@scu.edu");
+    const QString wrong = code == "000000" ? "111111" : "000000";
+
+    SUBCASE("One try short of the limit still allows the right code") {
+        for (int i = 0; i < LocalAccounts::MaxCodeAttempts - 1; ++i) {
+            CHECK(LocalAccounts::verifyEmail("guess@scu.edu", wrong) == Result::InvalidCode);
+        }
+        CHECK(LocalAccounts::verifyEmail("guess@scu.edu", code) == Result::Success);
+    }
+    SUBCASE("Reaching the limit cancels the code") {
+        for (int i = 0; i < LocalAccounts::MaxCodeAttempts; ++i) {
+            CHECK(LocalAccounts::verifyEmail("guess@scu.edu", wrong) == Result::InvalidCode);
+        }
+        CHECK(LocalAccounts::verifyEmail("guess@scu.edu", code) == Result::InvalidCode);
+    }
+}
+
+TEST_CASE("A sign-up whose code couldn't be sent leaves nothing behind") {
+    TestAccountStore store;
+    store.sendingFails = true;
+    createUnverified("offline@scu.edu");
+    CHECK(LocalAccounts::sendVerificationCode("offline@scu.edu") == Result::CodeNotSent);
+    LocalAccounts::cancelSignUp("offline@scu.edu");
+    LocalAccounts::Profile profile;
+    CHECK(LocalAccounts::signIn("offline@scu.edu", "correct-horse", profile)
+          == Result::IncorrectCredentials);
+
+    // An unverified sign-up is replaced by a new one with the same email.
+    store.sendingFails = false;
+    createUnverified("offline@scu.edu", "first-password");
+    createUnverified("OFFLINE@scu.edu", "second-password");
+    REQUIRE(LocalAccounts::sendVerificationCode("offline@scu.edu") == Result::Success);
+    REQUIRE(LocalAccounts::verifyEmail("offline@scu.edu", store.sentCodes.value("offline@scu.edu"))
+            == Result::Success);
+    CHECK(LocalAccounts::signIn("offline@scu.edu", "first-password", profile)
+          == Result::IncorrectCredentials);
+    CHECK(LocalAccounts::signIn("offline@scu.edu", "second-password", profile) == Result::Success);
+
+    // Once verified, the email is taken and cancelSignUp leaves the account alone.
+    CHECK(LocalAccounts::create("offline@scu.edu", "third-password", "Other", "basic", profile)
+          == Result::EmailTaken);
+    LocalAccounts::cancelSignUp("offline@scu.edu");
+    CHECK(LocalAccounts::signIn("offline@scu.edu", "second-password", profile) == Result::Success);
+}
+
+TEST_CASE("A forgotten password is reset with an emailed code") {
+    TestAccountStore store;
+    createAccount("forgot@scu.edu", "Forgetful");
+    createUnverified("pending@scu.edu");
+    CHECK(LocalAccounts::sendPasswordResetCode("nobody@scu.edu") == Result::InvalidEmail);
+    CHECK(LocalAccounts::sendPasswordResetCode("pending@scu.edu") == Result::EmailNotVerified);
+    CHECK(LocalAccounts::resetPassword("forgot@scu.edu", "123456", "new-password")
+          == Result::InvalidCode); // No reset code requested yet.
+
+    REQUIRE(LocalAccounts::sendPasswordResetCode("Forgot@SCU.edu") == Result::Success);
+    const QString code = store.sentCodes.value("forgot@scu.edu");
+    CHECK(isSixDigits(code));
+    const QString wrong = code == "000000" ? "111111" : "000000";
+    CHECK(LocalAccounts::resetPassword("forgot@scu.edu", code, "short") == Result::ShortPassword);
+    CHECK(LocalAccounts::resetPassword("forgot@scu.edu", wrong, "new-password")
+          == Result::InvalidCode);
+    // A reset code isn't a sign-up code.
+    CHECK(LocalAccounts::verifyEmail("forgot@scu.edu", code) == Result::InvalidCode);
+    REQUIRE(LocalAccounts::resetPassword("forgot@scu.edu", code, "new-password") == Result::Success);
+
+    LocalAccounts::Profile profile;
+    CHECK(LocalAccounts::signIn("forgot@scu.edu", "correct-horse", profile)
+          == Result::IncorrectCredentials);
+    CHECK(LocalAccounts::signIn("forgot@scu.edu", "new-password", profile) == Result::Success);
+    CHECK(LocalAccounts::resetPassword("forgot@scu.edu", code, "another-password")
+          == Result::InvalidCode); // Used up.
+
+    // When the code can't be sent, nothing is left that could be used.
+    store.sendingFails = true;
+    CHECK(LocalAccounts::sendPasswordResetCode("forgot@scu.edu") == Result::CodeNotSent);
+    CHECK(LocalAccounts::resetPassword("forgot@scu.edu", code, "another-password")
+          == Result::InvalidCode);
+}
+
+TEST_CASE("Accounts made before email verification existed can still sign in") {
+    TestAccountStore store;
+    createUnverified("early@scu.edu");
+    // Make the database look like version 2, before verification was required.
+    tamper({"PRAGMA user_version = 2"});
+    LocalAccounts::Profile profile;
+    CHECK(LocalAccounts::signIn("early@scu.edu", "correct-horse", profile) == Result::Success);
+}
+
+TEST_CASE("The real email sender refuses to send without its settings file") {
+    TestAccountStore store;
+    const QByteArray missing =
+        QDir(QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation))
+            .filePath("no-such-email-sender.ini")
+            .toUtf8();
+    qputenv("DINING_POINTS_EMAIL_CONFIG", missing);
+    EmailSender::setSender({}); // The real sender; it must fail before any network use.
+    CHECK(EmailSender::configPath() == QString::fromUtf8(missing));
+    CHECK_FALSE(EmailSender::send("someone@scu.edu", "123456", EmailSender::Purpose::Verification));
+    createUnverified("real@scu.edu");
+    CHECK(LocalAccounts::sendVerificationCode("real@scu.edu") == Result::CodeNotSent);
+    qunsetenv("DINING_POINTS_EMAIL_CONFIG");
 }

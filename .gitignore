@@ -5,3 +5,6 @@ build/
 CMakeUserPresets.json
 Thumbs.db
 *.pdb
+
+# Email sender settings (T15): contains the shared secret.
+email-sender.ini
