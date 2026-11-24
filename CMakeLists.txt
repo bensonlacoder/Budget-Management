@@ -18,7 +18,7 @@ file(GLOB TEST_SOURCES CONFIGURE_DEPENDS tests/*.cpp)
 
 set(PURCHASE_SOURCES UI/purchasespage.cpp UI/purchasespage.h UI/scumenu.cpp UI/scumenu.h
     UI/lunchcatalog.cpp UI/localaccounts.cpp UI/localaccounts.h
-    UI/emailsender.cpp UI/emailsender.h)
+    UI/emailsender.cpp UI/emailsender.h UI/menusearchdialog.cpp UI/menusearchdialog.h)
 
 add_executable(app ${APP_SOURCES} UI/main.cpp UI/mainui.cpp UI/mainui.h UI/mainui.ui
     UI/authdialog.cpp UI/authdialog.h

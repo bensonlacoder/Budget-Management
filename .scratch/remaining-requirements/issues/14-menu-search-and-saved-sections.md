@@ -1,6 +1,6 @@
 # 14: Find affordable meals and save menu sections
 
-**Owner:** Whoever finishes first (first ticket to cut)
+**Owner:** Nathan Gu
 
 **Requirements:** FR-44, FR-45
 
@@ -10,8 +10,8 @@
 
 **Blocked by:** 01 (SQLite storage), for saved sections
 
-**Status:** ready-for-agent
+**Status:** done (branch `t14-menu-search`)
 
-- [ ] The point-limit search lists matching items sorted by price; items priced at the receipt total are left out or labelled
-- [ ] The user can save a section (for example, a station at a location), see the saved list, and remove entries; the list is saved
-- [ ] Tests cover a price exactly at the limit, a price just above it, and saving and removing sections
+- [x] The point-limit search lists matching items sorted by price; items priced at the receipt total are left out or labelled
+- [x] The user can save a section (for example, a station at a location), see the saved list, and remove entries; the list is saved
+- [x] Tests cover a price exactly at the limit, a price just above it, and saving and removing sections

@@ -13,6 +13,7 @@ SOURCES += \
     localaccounts.cpp \
     main.cpp \
     mainui.cpp \
+    menusearchdialog.cpp \
     purchasespage.cpp \
     lunchcatalog.cpp \
     scumenu.cpp
@@ -25,6 +26,7 @@ HEADERS += \
     friendsdialog.h \
     localaccounts.h \
     mainui.h \
+    menusearchdialog.h \
     purchasespage.h \
     scumenu.h
 

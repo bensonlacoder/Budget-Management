@@ -92,6 +92,16 @@ Opening hours are fetched from the SCU dining site when available.
 **Account > Friends** shows your friend ID. Send a request with a friend's ID; once
 they accept, each of you can see the other's display name and balance.
 
+### Find meals
+
+**Menus > Find meals** lists every menu item, or size or option, that costs at most
+the points you enter, cheapest first, with its location. Choose a location to see
+only its items. Items priced at the receipt total aren't listed; a note says how
+many were left out. Select a meal and choose **Save this section** to keep its
+location for quick access; **Show items** jumps back to a saved section and
+**Remove** deletes it. Saved sections are kept with your account. Prices come from
+the dated reference menu.
+
 ### Budget tab
 
 1. Enter your points in **Amount** and click **Set balance**. The initial zero clears
@@ -207,6 +217,7 @@ again to confirm a passing run. Keep the submitted application branch passing.
 - `UI/main.cpp`: show sign-in, then build the main window, tabs and Account menu.
 - `UI/authdialog.*`: sign in, create an account, verify its email, or reset a password.
 - `UI/emailsender.*`: send codes through the Apps Script web app (`apps-script/`).
+- `UI/menusearchdialog.*`: find meals within a point limit and keep saved menu sections.
 - `UI/localaccounts.*`: all saved data (accounts, balances, purchases, refunds,
   corrections, plan settings, friends, saved menu sections) in SQLite. Pages call only
   these functions and never open the database themselves.
