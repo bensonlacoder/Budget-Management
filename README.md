@@ -77,6 +77,8 @@ the plan's points. Use **Account > Sign out** to switch accounts.
   minutes, and 5 wrong tries cancel a code.
 - Signing in before verifying sends a new code first.
 - **Forgot password?** on the sign-in screen emails a code for setting a new password.
+- **Account > Two-step sign-in** turns on asking for an emailed code after the password
+  at every sign-in. **Resend code** works the same way, and each code signs in once.
 - Sending codes needs the email sender set up; see [Email codes](#email-codes).
 
 ### Purchases tab
@@ -125,7 +127,7 @@ With fewer than 7 days left, the weekly recommendation equals the remaining bala
 
 ## Email codes
 
-The app sends sign-up and password reset codes through a Google Apps Script web app,
+The app sends sign-up, password reset and two-step sign-in codes through a Google Apps Script web app,
 [apps-script/send-code.gs](apps-script/send-code.gs), running on a Gmail account
 used only for this app. Without it, creating an account shows "Couldn't send the
 code. Try again." Tests never send email; they use a fake sender.
@@ -215,7 +217,8 @@ again to confirm a passing run. Keep the submitted application branch passing.
 - `UI/mainui.h` and `UI/mainui.cpp`: connect user actions to the models and update the display.
 - `UI/mainui.ui`: define the layout; edit it in Qt Designer.
 - `UI/main.cpp`: show sign-in, then build the main window, tabs and Account menu.
-- `UI/authdialog.*`: sign in, create an account, verify its email, or reset a password.
+- `UI/authdialog.*`: sign in (with an emailed code when two-step sign-in is on), create
+  an account, verify its email, or reset a password; also the Two-step sign-in menu item.
 - `UI/emailsender.*`: send codes through the Apps Script web app (`apps-script/`).
 - `UI/menusearchdialog.*`: find meals within a point limit and keep saved menu sections.
 - `UI/localaccounts.*`: all saved data (accounts, balances, purchases, refunds,

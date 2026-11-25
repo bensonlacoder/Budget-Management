@@ -5,7 +5,7 @@
 
 #include <functional>
 
-// Sends sign-up verification and password reset codes by email (T15).
+// Sends sign-up verification, password reset and two-step sign-in codes by email.
 //
 // The real sender posts to a Google Apps Script web app (apps-script/send-code.gs),
 // whose URL and shared secret are read from an INI file kept out of git:
@@ -17,7 +17,7 @@
 // The file is `email-sender.ini` in the app's local data folder, or the path in the
 // DINING_POINTS_EMAIL_CONFIG environment variable. See email-sender.example.ini.
 namespace EmailSender {
-enum class Purpose { Verification, PasswordReset };
+enum class Purpose { Verification, PasswordReset, SignIn };
 
 // Returns true once the email has been handed to the sender.
 using SendFunction = std::function<bool(const QString &email, const QString &code, Purpose)>;

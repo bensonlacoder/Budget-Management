@@ -9,6 +9,10 @@
 
 #include <QAction>
 #include <QComboBox>
+#include <QMainWindow>
+#include <QMenu>
+#include <QMenuBar>
+#include <QStatusBar>
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
@@ -210,4 +214,98 @@ TEST_CASE("The eye button shows and hides each password, and new screens start h
     CHECK(form.password->echoMode() == QLineEdit::Password);
     CHECK(form.confirmation->echoMode() == QLineEdit::Password);
     CHECK_FALSE(revealPassword->isChecked());
+}
+
+// Author: Nathan Gu
+TEST_CASE("Two-step sign-in asks for an emailed code after the password") {
+    TestAccountStore store;
+    const auto created = store.createVerified("twostep@scu.edu", "Careful", "basic", "long-password");
+    REQUIRE(LocalAccounts::setTwoStepSignIn(created.accountId, true)
+            == LocalAccounts::Result::Success);
+    AuthDialog dialog;
+    AuthForm form(dialog);
+
+    form.email->setText("twostep@scu.edu");
+    form.password->setText("wrong-password");
+    form.submit->click();
+    CHECK(form.message->text() == "Incorrect email or password.");
+    CHECK(form.submit->text() == "&Sign in");
+    CHECK_FALSE(form.code->isVisibleTo(&dialog));
+
+    const int sentBefore = store.emailsSent;
+    form.password->setText("long-password");
+    form.submit->click();
+    CHECK_FALSE(form.accepted());
+    CHECK(form.message->text() == "Two-step sign-in is on. We sent a 6-digit code to twostep@scu.edu.");
+    CHECK(store.emailsSent == sentBefore + 1);
+    CHECK(form.code->isVisibleTo(&dialog));
+    CHECK_FALSE(form.email->isVisibleTo(&dialog));
+    CHECK_FALSE(form.password->isVisibleTo(&dialog));
+    CHECK(form.sendCode->text() == "Resend code");
+
+    form.submit->click(); // No code entered.
+    CHECK(form.message->text() == "Enter the 6-digit code from the email.");
+    const QString code = store.sentCodes.value("twostep@scu.edu");
+    form.code->setText(code == "000000" ? "111111" : "000000");
+    form.submit->click();
+    CHECK(form.message->text() == "That code isn't right. Check the email, or send a new code.");
+    CHECK_FALSE(form.accepted());
+
+    form.sendCode->click(); // Resend: only the newest code works.
+    CHECK(store.emailsSent == sentBefore + 2);
+    CHECK(form.message->text().startsWith("We sent a 6-digit code to twostep@scu.edu."));
+    form.code->setText(store.sentCodes.value("twostep@scu.edu"));
+    form.submit->click();
+    REQUIRE(form.accepted());
+    CHECK(dialog.accountName() == created.accountId);
+    CHECK(dialog.profile().twoStepSignIn);
+}
+
+// Author: Nathan Gu
+TEST_CASE("A sign-in code that can't be sent keeps the user on the sign-in screen") {
+    TestAccountStore store;
+    const auto created = store.createVerified("offline2@scu.edu", "Offline", "basic", "long-password");
+    REQUIRE(LocalAccounts::setTwoStepSignIn(created.accountId, true)
+            == LocalAccounts::Result::Success);
+    store.sendingFails = true;
+    AuthDialog dialog;
+    AuthForm form(dialog);
+    form.email->setText("offline2@scu.edu");
+    form.password->setText("long-password");
+    form.submit->click();
+    CHECK(form.message->text() == "Couldn't send the code. Try again.");
+    CHECK(form.submit->text() == "&Sign in");
+    CHECK(form.password->isVisibleTo(&dialog));
+    CHECK_FALSE(form.accepted());
+}
+
+// Author: Nathan Gu
+TEST_CASE("The Account menu turns two-step sign-in on and off") {
+    TestAccountStore store;
+    const auto created = store.createVerified("menu@scu.edu", "Menu");
+    QMainWindow window;
+    QMenu *menu = window.menuBar()->addMenu("&Account");
+    QAction *action = addTwoStepSignInAction(menu, &window, created.accountId, false);
+    REQUIRE(action);
+    CHECK(action->isCheckable());
+    CHECK_FALSE(action->isChecked());
+
+    action->trigger();
+    CHECK(action->isChecked());
+    CHECK(window.statusBar()->currentMessage().startsWith("Two-step sign-in is on."));
+    LocalAccounts::Profile profile;
+    REQUIRE(LocalAccounts::loadProfile(created.accountId, profile));
+    CHECK(profile.twoStepSignIn);
+
+    action->trigger();
+    CHECK_FALSE(action->isChecked());
+    CHECK(window.statusBar()->currentMessage().startsWith("Two-step sign-in is off."));
+    REQUIRE(LocalAccounts::loadProfile(created.accountId, profile));
+    CHECK_FALSE(profile.twoStepSignIn);
+
+    // If the change can't be saved, the check mark goes back.
+    QAction *broken = addTwoStepSignInAction(menu, &window, "no-such-account", false);
+    broken->trigger();
+    CHECK_FALSE(broken->isChecked());
+    CHECK(window.statusBar()->currentMessage() == "Couldn't change two-step sign-in. Try again.");
 }

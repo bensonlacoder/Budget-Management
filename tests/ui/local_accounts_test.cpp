@@ -930,3 +930,104 @@ TEST_CASE("The real email sender refuses to send without its settings file") {
     CHECK(LocalAccounts::sendVerificationCode("real@scu.edu") == Result::CodeNotSent);
     qunsetenv("DINING_POINTS_EMAIL_CONFIG");
 }
+
+// ---- Two-step sign-in ----
+
+// Author: Nathan Gu
+TEST_CASE("Two-step sign-in is off by default and asks for an emailed code once turned on") {
+    TestAccountStore store;
+    const auto created = createAccount("careful@scu.edu", "Careful");
+    LocalAccounts::Profile profile;
+    REQUIRE(LocalAccounts::signIn("careful@scu.edu", "correct-horse", profile) == Result::Success);
+    CHECK_FALSE(profile.twoStepSignIn);
+
+    REQUIRE(LocalAccounts::setTwoStepSignIn(created.accountId, true) == Result::Success);
+    REQUIRE(LocalAccounts::loadProfile(created.accountId, profile));
+    CHECK(profile.twoStepSignIn);
+
+    // The password alone no longer signs in, and a wrong password still says so.
+    profile = {};
+    CHECK(LocalAccounts::signIn("careful@scu.edu", "correct-horse", profile) == Result::CodeRequired);
+    CHECK(profile.accountId.isEmpty());
+    CHECK(LocalAccounts::signIn("careful@scu.edu", "wrong-password", profile)
+          == Result::IncorrectCredentials);
+
+    // A code is only sent with the right password.
+    const int sentBefore = store.emailsSent;
+    CHECK(LocalAccounts::sendSignInCode("careful@scu.edu", "wrong-password")
+          == Result::IncorrectCredentials);
+    CHECK(LocalAccounts::sendSignInCode("nobody@scu.edu", "correct-horse")
+          == Result::IncorrectCredentials);
+    CHECK(store.emailsSent == sentBefore);
+    REQUIRE(LocalAccounts::sendSignInCode("Careful@SCU.edu", "correct-horse") == Result::Success);
+    CHECK(store.emailsSent == sentBefore + 1);
+    const QString code = store.sentCodes.value("careful@scu.edu");
+    CHECK(isSixDigits(code));
+    const QString wrong = code == "000000" ? "111111" : "000000";
+
+    CHECK(LocalAccounts::finishSignIn("careful@scu.edu", "correct-horse", wrong, profile)
+          == Result::InvalidCode);
+    // The right code with the wrong password doesn't sign in.
+    CHECK(LocalAccounts::finishSignIn("careful@scu.edu", "wrong-password", code, profile)
+          == Result::IncorrectCredentials);
+    REQUIRE(LocalAccounts::finishSignIn("careful@scu.edu", "correct-horse", code, profile)
+            == Result::Success);
+    CHECK(profile.accountId == created.accountId);
+    CHECK(profile.twoStepSignIn);
+    // Each code works once.
+    CHECK(LocalAccounts::finishSignIn("careful@scu.edu", "correct-horse", code, profile)
+          == Result::InvalidCode);
+
+    // Turning it off goes back to the password alone.
+    REQUIRE(LocalAccounts::setTwoStepSignIn(created.accountId, false) == Result::Success);
+    CHECK(LocalAccounts::signIn("careful@scu.edu", "correct-horse", profile) == Result::Success);
+}
+
+// Author: Nathan Gu
+TEST_CASE("Sign-in codes can't be swapped with other codes, and failures are reported") {
+    TestAccountStore store;
+    const auto created = createAccount("swap@scu.edu", "Swapper");
+    REQUIRE(LocalAccounts::setTwoStepSignIn(created.accountId, true) == Result::Success);
+    CHECK(LocalAccounts::setTwoStepSignIn("no-such-account", true) == Result::StorageError);
+    LocalAccounts::Profile profile;
+
+    // A password reset code doesn't finish a sign-in, and a sign-in code doesn't reset.
+    REQUIRE(LocalAccounts::sendPasswordResetCode("swap@scu.edu") == Result::Success);
+    const QString resetCode = store.sentCodes.value("swap@scu.edu");
+    CHECK(LocalAccounts::finishSignIn("swap@scu.edu", "correct-horse", resetCode, profile)
+          == Result::InvalidCode);
+    REQUIRE(LocalAccounts::sendSignInCode("swap@scu.edu", "correct-horse") == Result::Success);
+    const QString signInCode = store.sentCodes.value("swap@scu.edu");
+    CHECK(LocalAccounts::resetPassword("swap@scu.edu", signInCode, "new-password")
+          == Result::InvalidCode);
+
+    // A new code replaces the old one.
+    REQUIRE(LocalAccounts::sendSignInCode("swap@scu.edu", "correct-horse") == Result::Success);
+    const QString newest = store.sentCodes.value("swap@scu.edu");
+    if (newest != signInCode) {
+        CHECK(LocalAccounts::finishSignIn("swap@scu.edu", "correct-horse", signInCode, profile)
+              == Result::InvalidCode);
+    }
+
+    // An unsent code can't be used, and an unverified account gets no sign-in code.
+    store.sendingFails = true;
+    CHECK(LocalAccounts::sendSignInCode("swap@scu.edu", "correct-horse") == Result::CodeNotSent);
+    CHECK(LocalAccounts::finishSignIn("swap@scu.edu", "correct-horse", newest, profile)
+          == Result::InvalidCode);
+    store.sendingFails = false;
+    createUnverified("pending@scu.edu");
+    CHECK(LocalAccounts::sendSignInCode("pending@scu.edu", "correct-horse")
+          == Result::EmailNotVerified);
+}
+
+// Author: Nathan Gu
+TEST_CASE("A version-3 database gains two-step sign-in, turned off") {
+    TestAccountStore store;
+    createAccount("older@scu.edu", "Older");
+    // Make the database look like version 3, before two-step sign-in existed.
+    tamper({"ALTER TABLE accounts DROP COLUMN two_step", "PRAGMA user_version = 3"});
+    LocalAccounts::Profile profile;
+    REQUIRE(LocalAccounts::signIn("older@scu.edu", "correct-horse", profile) == Result::Success);
+    CHECK_FALSE(profile.twoStepSignIn);
+    CHECK(LocalAccounts::setTwoStepSignIn(profile.accountId, true) == Result::Success);
+}
