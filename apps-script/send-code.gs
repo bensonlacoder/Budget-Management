@@ -1,12 +1,12 @@
 /**
- * Dining Points Budget: email sender for sign-up and password reset codes (T15).
+ * Dining Points Budget: email sender for sign-up, password reset and sign-in codes.
  *
  * Deploy from a Gmail account used only for this app. Setup steps are in README.md
  * under "Email codes". The shared secret is NOT written in this file: set it as the
  * script property SHARED_SECRET (Project Settings > Script properties), and put the
  * same value in the app's email-sender.ini.
  *
- * Request (POST, JSON): {"secret", "email", "code", "purpose": "verify" | "reset"}
+ * Request (POST, JSON): {"secret", "email", "code", "purpose": "verify" | "reset" | "signin"}
  * Reply (JSON): {"ok": true} or {"ok": false, "error": "..."}
  */
 
@@ -36,12 +36,17 @@ function doPost(e) {
       return reply({ ok: false, error: 'too many emails' });
     }
 
-    const reset = body.purpose === 'reset';
-    const subject = reset ? 'Your Dining Points Budget password reset code'
-                          : 'Confirm your Dining Points Budget email';
-    const text = (reset ? 'Use this code to reset your password: '
-                        : 'Use this code to finish creating your account: ')
-      + code + '\n\nThe code expires in 15 minutes. If you did not ask for it, ignore this email.';
+    const messages = {
+      verify: ['Confirm your Dining Points Budget email',
+               'Use this code to finish creating your account: '],
+      reset: ['Your Dining Points Budget password reset code',
+              'Use this code to reset your password: '],
+      signin: ['Your Dining Points Budget sign-in code',
+               'Use this code to finish signing in: '],
+    };
+    const [subject, intro] = messages[body.purpose] || messages.verify;
+    const text = intro + code
+      + '\n\nThe code expires in 15 minutes. If you did not ask for it, ignore this email.';
     MailApp.sendEmail({ to: email, subject: subject, body: text, name: 'Dining Points Budget' });
 
     cache.put(key, String(sent + 1), 60 * 60);

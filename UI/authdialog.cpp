@@ -9,10 +9,14 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QLocale>
+#include <QMainWindow>
+#include <QMenu>
 #include <QPainter>
 #include <QPainterPath>
 #include <QPixmap>
 #include <QPushButton>
+#include <QSignalBlocker>
+#include <QStatusBar>
 #include <QVBoxLayout>
 
 using LocalAccounts::Result;
@@ -168,24 +172,26 @@ void AuthDialog::showScreen(Screen next) {
     const bool creating = next == Screen::CreateAccount;
     const bool verifying = next == Screen::VerifyEmail;
     const bool resetting = next == Screen::ResetPassword;
+    // Screens where only the emailed code is entered.
+    const bool codeOnly = verifying || next == Screen::SignInCode;
 
     static const char *const headings[] = {"Sign in", "Create an account", "Verify your email",
-                                           "Reset your password"};
+                                           "Reset your password", "Enter your sign-in code"};
     static const char *const actions[] = {"&Sign in", "&Create account", "&Verify",
-                                          "&Reset password"};
+                                          "&Reset password", "&Sign in"};
     heading->setText(tr(headings[static_cast<int>(next)]));
     submitButton->setText(tr(actions[static_cast<int>(next)]));
     switchButton->setText(signingIn ? tr("Create an account") : tr("Back to sign in"));
-    codeButton->setText(verifying ? tr("Resend code") : tr("Send code"));
+    codeButton->setText(codeOnly ? tr("Resend code") : tr("Send code"));
     passwordLabel->setText(resetting ? tr("&New password") : tr("&Password"));
 
-    form->setRowVisible(email, !verifying);
+    form->setRowVisible(email, !codeOnly);
     form->setRowVisible(displayName, creating);
     form->setRowVisible(diningPlan, creating);
-    form->setRowVisible(code, verifying || resetting);
-    form->setRowVisible(password, !verifying);
+    form->setRowVisible(code, codeOnly || resetting);
+    form->setRowVisible(password, !codeOnly);
     form->setRowVisible(confirmation, creating || resetting);
-    codeButton->setVisible(verifying || resetting);
+    codeButton->setVisible(codeOnly || resetting);
     forgotButton->setVisible(signingIn);
 
     if (creating) {
@@ -198,7 +204,7 @@ void AuthDialog::showScreen(Screen next) {
     revealConfirmation->setChecked(false);
     code->clear();
     message->clear();
-    (verifying ? code : email)->setFocus();
+    (codeOnly ? code : email)->setFocus();
 }
 
 void AuthDialog::submit() {
@@ -214,6 +220,9 @@ void AuthDialog::submit() {
         break;
     case Screen::ResetPassword:
         resetPassword();
+        break;
+    case Screen::SignInCode:
+        finishSignIn();
         break;
     }
 }
@@ -239,7 +248,41 @@ void AuthDialog::signIn() {
         }
         return;
     }
+    if (result == Result::CodeRequired) {
+        Result sent;
+        {
+            BusyCursor busy;
+            sent = LocalAccounts::sendSignInCode(enteredEmail, password->text());
+        }
+        if (sent != Result::Success) {
+            showError(sent);
+            return;
+        }
+        pendingEmail = enteredEmail;
+        pendingPassword = password->text();
+        showScreen(Screen::SignInCode);
+        message->setText(tr("Two-step sign-in is on. We sent a 6-digit code to %1.")
+                             .arg(pendingEmail));
+        return;
+    }
     showError(result);
+}
+
+void AuthDialog::finishSignIn() {
+    if (code->text().trimmed().isEmpty()) {
+        message->setText(tr("Enter the 6-digit code from the email."));
+        return;
+    }
+    const Result result =
+        LocalAccounts::finishSignIn(pendingEmail, pendingPassword, code->text(), signedInProfile);
+    if (result != Result::Success) {
+        showError(result);
+        code->clear();
+        code->setFocus();
+        return;
+    }
+    pendingPassword.clear();
+    accept();
 }
 
 void AuthDialog::createAccount() {
@@ -339,6 +382,9 @@ void AuthDialog::sendCode() {
         if (screen == Screen::VerifyEmail) {
             address = pendingEmail;
             result = LocalAccounts::sendVerificationCode(address);
+        } else if (screen == Screen::SignInCode) {
+            address = pendingEmail;
+            result = LocalAccounts::sendSignInCode(address, pendingPassword);
         } else {
             address = email->text().trimmed();
             if (address.isEmpty()) {
@@ -404,4 +450,27 @@ void AuthDialog::showError(Result result) {
         message->setText(tr("Could not open the account database. Try again."));
         break;
     }
+}
+
+QAction *addTwoStepSignInAction(QMenu *menu, QMainWindow *window, const QString &account,
+                                bool enabled) {
+    auto *action = menu->addAction(QObject::tr("&Two-step sign-in"));
+    action->setObjectName("twoStepSignInAction");
+    action->setCheckable(true);
+    action->setChecked(enabled);
+    action->setToolTip(QObject::tr("Also ask for a code sent to your email each time you sign in"));
+    QObject::connect(action, &QAction::toggled, window, [action, window, account](bool on) {
+        if (LocalAccounts::setTwoStepSignIn(account, on) != Result::Success) {
+            const QSignalBlocker blocker(action); // Undo the check mark without saving again.
+            action->setChecked(!on);
+            window->statusBar()->showMessage(
+                QObject::tr("Couldn't change two-step sign-in. Try again."));
+            return;
+        }
+        window->statusBar()->showMessage(
+            on ? QObject::tr("Two-step sign-in is on. Each time you sign in, also enter the code "
+                             "we email you.")
+               : QObject::tr("Two-step sign-in is off. You'll sign in with just your password."));
+    });
+    return action;
 }

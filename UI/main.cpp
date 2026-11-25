@@ -49,6 +49,7 @@ int main(int argc, char *argv[]) {
             dialog->setAttribute(Qt::WA_DeleteOnClose);
             dialog->show();
         });
+        addTwoStepSignInAction(accountMenu, window, accountName, profile.twoStepSignIn);
         auto *signOut = accountMenu->addAction(QObject::tr("Sign &out"));
         QObject::connect(signOut, &QAction::triggered, window, [&auth, window] {
             auth.reset();

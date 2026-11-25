@@ -34,7 +34,9 @@ bool sendWithAppsScript(const QString &email, const QString &code, EmailSender::
         {"secret", secret},
         {"email", email},
         {"code", code},
-        {"purpose", purpose == EmailSender::Purpose::PasswordReset ? "reset" : "verify"}};
+        {"purpose", purpose == EmailSender::Purpose::PasswordReset ? "reset"
+                    : purpose == EmailSender::Purpose::SignIn      ? "signin"
+                                                                   : "verify"}};
     QNetworkRequest request(url);
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
     // Apps Script answers through a redirect to googleusercontent.com.

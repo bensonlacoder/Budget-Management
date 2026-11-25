@@ -42,7 +42,8 @@ enum class Result {
     InvalidCode,         // Wrong code, no code requested, or too many wrong tries.
     CodeExpired,         // Older than CodeLifetimeMinutes; request a new one.
     CodeNotSent,         // The email sender could not be reached.
-    StorageError         // The database could not be opened, read or written.
+    CodeRequired,        // Right password, but two-step sign-in also needs an emailed code.
+    StorageError        // The database could not be opened, read or written.
 };
 
 // Days left in the budgeting period, including today. Matches Budget's 0 to 90 range.
@@ -64,6 +65,8 @@ struct Profile {
     bool daysCorrected = false;
     // When the balance or history last changed successfully (T12). Invalid until then.
     QDateTime lastUpdated;
+    // When true, signing in also needs a code emailed to the account.
+    bool twoStepSignIn = false;
     // Pass this as `account` to every other function.
     QString accountId;
 };
@@ -147,6 +150,7 @@ const QList<DiningPlan> &diningPlans();
 Result create(const QString &email, const QString &password, const QString &displayName,
               const QString &diningPlanId, Profile &profile);
 // EmailNotVerified if the password is right but the email hasn't been verified yet.
+// CodeRequired if two-step sign-in is on: call sendSignInCode(), then finishSignIn().
 Result signIn(const QString &email, const QString &password, Profile &profile);
 bool loadProfile(const QString &account, Profile &profile);
 Result updateProfile(const QString &account, const QString &displayName, const QString &email);
@@ -236,6 +240,16 @@ void cancelSignUp(const QString &email);
 Result sendPasswordResetCode(const QString &email);
 // ShortPassword if the new password is too short (checked before the code).
 Result resetPassword(const QString &email, const QString &code, const QString &newPassword);
+
+// ---- Two-step sign-in ----
+// Turns on or off asking for an emailed code after the password at every sign-in.
+Result setTwoStepSignIn(const QString &account, bool enabled);
+// Emails a sign-in code. The password is checked first (IncorrectCredentials), so the
+// email alone can't be used to send codes.
+Result sendSignInCode(const QString &email, const QString &password);
+// Signs in with the password and the emailed code. The code works once.
+Result finishSignIn(const QString &email, const QString &password, const QString &code,
+                    Profile &profile);
 }
 
 #endif // LOCALACCOUNTS_H

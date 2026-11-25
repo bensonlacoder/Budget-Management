@@ -28,7 +28,7 @@ constexpr int HASH_ITERATIONS = 600000;
 constexpr int FRIEND_ID_LENGTH = 12;
 // Wait this long if another window of the app is writing the database.
 constexpr int BUSY_TIMEOUT_MS = 3000;
-constexpr int SCHEMA_VERSION = 3;
+constexpr int SCHEMA_VERSION = 4;
 const QString CONNECTION = QStringLiteral("dining-points-budget");
 
 // ---- Points are stored as whole cents so comparisons are exact. ----
@@ -100,7 +100,8 @@ bool createSchema(QSqlDatabase &db) {
         " reserve_cents INTEGER NOT NULL DEFAULT 0,"
         " habits TEXT NOT NULL DEFAULT '0,0,0,0,0,0,0',"
         " alert_over_daily INTEGER NOT NULL DEFAULT 0,"
-        " alert_run_out INTEGER NOT NULL DEFAULT 0)",
+        " alert_run_out INTEGER NOT NULL DEFAULT 0,"
+        " two_step INTEGER NOT NULL DEFAULT 0)",
         "CREATE TABLE IF NOT EXISTS purchases ("
         " id TEXT PRIMARY KEY,"
         " account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,"
@@ -169,6 +170,19 @@ bool createSchema(QSqlDatabase &db) {
     if (version >= 1 && version < 3
         && !query.exec(QStringLiteral("UPDATE accounts SET email_verified = 1"))) {
         return false;
+    }
+    // Version 4 adds two-step sign-in, off for existing accounts.
+    if (version >= 1 && version < 4) {
+        if (!query.exec(QStringLiteral(
+                "SELECT COUNT(*) FROM pragma_table_info('accounts') WHERE name = 'two_step'"))
+            || !query.next()) {
+            return false;
+        }
+        if (query.value(0).toInt() == 0
+            && !query.exec(QStringLiteral(
+                "ALTER TABLE accounts ADD COLUMN two_step INTEGER NOT NULL DEFAULT 0"))) {
+            return false;
+        }
     }
     for (const char *statement : statements) {
         if (!query.exec(QString::fromLatin1(statement))) {
@@ -287,7 +301,7 @@ QString normalizedFriendId(const QString &friendId) {
 
 constexpr auto PROFILE_COLUMNS =
     "id, email, display_name, friend_id, dining_plan, balance_cents, remaining_days,"
-    " days_counted_on, days_corrected, last_updated";
+    " days_counted_on, days_corrected, last_updated, two_step";
 
 // Last-updated times are saved in UTC (ISO 8601 with milliseconds) and returned in
 // local time. Returns an invalid QDateTime for a missing or empty value.
@@ -310,6 +324,7 @@ LocalAccounts::Profile profileFrom(const QSqlQuery &row) {
         QDate::currentDate());
     profile.daysCorrected = row.value(8).toBool();
     profile.lastUpdated = lastUpdatedFrom(row.value(9));
+    profile.twoStepSignIn = row.value(10).toBool();
     return profile;
 }
 
@@ -533,32 +548,53 @@ Result create(const QString &email, const QString &password, const QString &disp
     });
 }
 
-Result signIn(const QString &email, const QString &password, Profile &profile) {
+namespace {
+// What a correct password tells about its account.
+struct PasswordCheck {
+    QString account;
+    bool verified = false;
+    bool twoStep = false;
+};
+
+// Checks the email and password: Success, IncorrectCredentials or StorageError.
+Result checkPassword(const QString &email, const QString &password, PasswordCheck &checked) {
     QSqlDatabase db = database();
     if (!db.isOpen()) {
         return Result::StorageError;
     }
     QSqlQuery query(db);
-    if (!run(query, QStringLiteral("SELECT id, salt, hash, balance_cents, email_verified"
+    if (!run(query, QStringLiteral("SELECT id, salt, hash, balance_cents, email_verified, two_step"
                                    " FROM accounts WHERE email = ?"),
              {normalizedEmail(email)})) {
         return Result::StorageError;
     }
-    if (!query.next()) {
-        return Result::IncorrectCredentials;
-    }
-    if (!passwordMatches(password, query.value(1).toString(), query.value(2).toString())) {
+    if (!query.next()
+        || !passwordMatches(password, query.value(1).toString(), query.value(2).toString())) {
         return Result::IncorrectCredentials;
     }
     // A damaged balance would make Balance throw when the window opens.
     if (query.value(3).toLongLong() < 0) {
         return Result::StorageError;
     }
-    if (!query.value(4).toBool()) {
+    checked = {query.value(0).toString(), query.value(4).toBool(), query.value(5).toBool()};
+    return Result::Success;
+}
+}
+
+Result signIn(const QString &email, const QString &password, Profile &profile) {
+    PasswordCheck checked;
+    const Result result = checkPassword(email, password, checked);
+    if (result != Result::Success) {
+        return result;
+    }
+    if (!checked.verified) {
         return Result::EmailNotVerified;
     }
-    return selectProfile(db, query.value(0).toString(), profile) ? Result::Success
-                                                                 : Result::StorageError;
+    if (checked.twoStep) {
+        return Result::CodeRequired;
+    }
+    QSqlDatabase db = database();
+    return selectProfile(db, checked.account, profile) ? Result::Success : Result::StorageError;
 }
 
 bool loadProfile(const QString &account, Profile &profile) {
@@ -1225,6 +1261,7 @@ namespace {
 constexpr int CODE_DIGITS = 6;
 const QString VERIFY = QStringLiteral("verify");
 const QString RESET = QStringLiteral("reset");
+const QString SIGN_IN = QStringLiteral("signin");
 
 QByteArray codeHash(const QString &code, const QByteArray &salt) {
     return QCryptographicHash::hash(salt + code.toUtf8(), QCryptographicHash::Sha256);
@@ -1246,7 +1283,7 @@ bool accountByEmail(QSqlDatabase &db, const QString &email, QString &account, bo
 // Stores a new code for `purpose`, replacing any earlier one, then emails it. The code
 // is removed again if the email can't be sent.
 //   verify: for unverified accounts; an already verified one needs nothing (Success).
-//   reset:  for verified accounts; an unverified one gives EmailNotVerified.
+//   reset, signin: for verified accounts; an unverified one gives EmailNotVerified.
 Result issueCode(const QString &email, const QString &purpose) {
     const QString code = QStringLiteral("%1").arg(
         QRandomGenerator::system()->bounded(1000000), CODE_DIGITS, 10, QLatin1Char('0'));
@@ -1262,7 +1299,7 @@ Result issueCode(const QString &email, const QString &purpose) {
             nothingToDo = true;
             return Result::Success;
         }
-        if (purpose == RESET && !verified) {
+        if (purpose != VERIFY && !verified) {
             return Result::EmailNotVerified;
         }
         const QString expires = QDateTime::currentDateTimeUtc()
@@ -1279,8 +1316,9 @@ Result issueCode(const QString &email, const QString &purpose) {
     if (stored != Result::Success || nothingToDo) {
         return stored;
     }
-    const auto kind = purpose == RESET ? EmailSender::Purpose::PasswordReset
-                                       : EmailSender::Purpose::Verification;
+    const auto kind = purpose == RESET     ? EmailSender::Purpose::PasswordReset
+                      : purpose == SIGN_IN ? EmailSender::Purpose::SignIn
+                                           : EmailSender::Purpose::Verification;
     if (EmailSender::send(normalizedEmail(email), code, kind)) {
         return Result::Success;
     }
@@ -1391,6 +1429,38 @@ Result resetPassword(const QString &email, const QString &code, const QString &n
                    {QString::fromLatin1(salt.toHex()), QString::fromLatin1(hash.toHex()), account})
             ? Result::Success
             : Result::StorageError;
+    });
+}
+
+// ---- Two-step sign-in ----
+
+Result setTwoStepSignIn(const QString &account, bool enabled) {
+    return inTransaction([&](QSqlDatabase &db) {
+        QSqlQuery query(db);
+        if (!run(query, QStringLiteral("UPDATE accounts SET two_step = ? WHERE id = ?"),
+                 {enabled ? 1 : 0, account})) {
+            return Result::StorageError;
+        }
+        return query.numRowsAffected() == 1 ? Result::Success : Result::StorageError;
+    });
+}
+
+Result sendSignInCode(const QString &email, const QString &password) {
+    PasswordCheck checked;
+    const Result result = checkPassword(email, password, checked);
+    return result == Result::Success ? issueCode(email, SIGN_IN) : result;
+}
+
+Result finishSignIn(const QString &email, const QString &password, const QString &code,
+                    Profile &profile) {
+    // The password is checked first so a wrong one doesn't use up a code attempt.
+    PasswordCheck checked;
+    const Result result = checkPassword(email, password, checked);
+    if (result != Result::Success) {
+        return result;
+    }
+    return useCode(email, SIGN_IN, code, [&](QSqlDatabase &db, const QString &account) {
+        return selectProfile(db, account, profile) ? Result::Success : Result::StorageError;
     });
 }
 }
