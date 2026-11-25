@@ -8,8 +8,8 @@ Four people, one week. Tickets are in [issues/](issues/), numbered in dependency
 | --- | --- | --- |
 | **Nathan Gu** | Storage and accounts | 00 (storage header part) → 01 SQLite storage and email sign-in → 12 Last updated → 15 Email verification and password reset |
 | **Benson** | Profile, quarters, Budget tab | 00 (skeleton part) → 03 Quarter calendar → 02 Profile page → 04 Budget tab sandbox |
-| **P3** | Purchases and charts | 08 Filter and edit history → 09 Refunds → 10 Location totals and charts → 11 Budget vs. actual |
-| **P4** | Advice and friends | 06 Reserve goal → 07 Dining habits and suggestions → 05 Pending requests and remove friend → 13 Alerts |
+| **Nathan Jeong** | Purchases and charts | 08 Filter and edit history → 09 Refunds → 10 Location totals and charts → 11 Budget vs. actual |
+| **Jackie** | Advice and friends | 06 Reserve goal → 07 Dining habits and suggestions → 05 Pending requests and remove friend → 13 Alerts |
 | **Nathan Gu** (finished P1 first) | Menus | 14 Menu search and saved sections |
 | After the deadline | Backend | 16 Move to a hosted backend |
 
