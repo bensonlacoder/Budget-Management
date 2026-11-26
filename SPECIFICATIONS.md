@@ -213,3 +213,28 @@ Fri,1
 have 10 campus days and 20 meals; with 400 spendable points that is 20 per meal and
 40 per campus day. 3 days starting on a Saturday have 1 campus day. Habits of all 0,
 or a meal count of 11, give no suggestions or are rejected.
+
+## SP-09: Spending alerts
+
+**Requirements:** FR-41, FR-42
+
+The Plan tab has two alert choices, each off until turned on, saved separately:
+
+- **Over today's budget:** applies when today's net spending (SP-07's rules,
+  counting only today) is more than today's budget. Today's budget is the daily
+  advice (SP-04) worked out from the balance before today's spending, so spending
+  today doesn't lower its own limit: (balance + spent today - reserve) / days
+  remaining, rounded down to the hundredth.
+- **Run out before the quarter ends:** applies when the projected end balance
+  (SP-07) is below 0.
+
+Neither applies once the quarter has ended (0 days remaining). An alert that is
+off never appears. While an alert that is on applies, the Plan tab shows it in a
+red banner at the top, and the app pops it up once a day, at most, the first time
+it applies after sign-in or after the balance, days, reserve, or alert choice
+changes. The banner disappears when the alert stops applying.
+
+**Test cases:** with 695 points left after spending 25 today, no reserve and 72
+days, today's budget is (695 + 25) / 72 = 10 and the over-budget alert applies;
+with 710 left after spending exactly 10, it does not. With 700 points, 70 days and 11 points a day of recent spending, the run-out
+alert applies; at 10 a day it does not. With either alert off, nothing appears.

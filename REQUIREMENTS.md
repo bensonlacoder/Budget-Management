@@ -27,7 +27,7 @@
 | ✅ FR-46 | Verify the account's email address with a code sent at sign-up before the account can be used, and request a new code if it expires or does not arrive. |
 | ✅ FR-48 | Turn two-step sign-in on or off. While it is on, signing in also requires a code sent to the account's email address, which can be resent and works only once. |
 | ✅ FR-22 | See the current quarter's dates from the SCU academic calendar (first day of classes through the last day of finals) and have the days remaining calculated from them automatically. Between quarters, see the next quarter's full length and the date it starts. |
-| FR-23 | Reopen the app and find the signed-in account's saved balance, history, budget settings, alert preferences, friends, and saved menus. |
+| ✅ FR-23 | Reopen the app and find the signed-in account's saved balance, history, budget settings, alert preferences, friends, and saved menus. |
 
 ### Add friends
 
@@ -67,8 +67,8 @@
 | ✅ FR-07 | See how many dining points they can spend over the next seven days or through the quarter end if sooner. |
 | ✅ FR-39 | Get spending suggestions based on the current balance, time remaining, reserve goal, and dining habits. Use the days remaining from the quarter calendar, or the manually corrected count when there is one. |
 | ✅ FR-40 | See spending recommendations refresh after changes to the balance, remaining time, reserve goal, or dining habits. |
-| FR-41 | Choose separately whether to receive alerts for going over the daily budget and for running out of points before the quarter ends. |
-| FR-42 | Receive enabled alerts when recorded spending exceeds the daily budget or projected spending would exhaust the balance before quarter end. |
+| ✅ FR-41 | Choose separately whether to receive alerts for going over the daily budget and for running out of points before the quarter ends. |
+| ✅ FR-42 | Receive enabled alerts when recorded spending exceeds the daily budget or projected spending would exhaust the balance before quarter end. |
 | ✅ FR-43 | See when projected spending would leave fewer points than the end-of-quarter reserve goal. |
 
 ### Find and save
