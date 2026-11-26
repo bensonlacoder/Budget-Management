@@ -15,6 +15,7 @@
 #include <QStandardPaths>
 
 #include <limits>
+#include <tuple>
 
 using LocalAccounts::CorrectionMode;
 using LocalAccounts::HistoryEntry;
@@ -57,6 +58,40 @@ void tamper(std::initializer_list<const char *> statements) {
 }
 
 // ---- Accounts ----
+
+// Author: Nathan Gu
+TEST_CASE("The dining plans are SCU's five quarter plans with their starting points") {
+    const auto &plans = LocalAccounts::diningPlans();
+    REQUIRE(plans.size() == 5);
+    const QList<std::tuple<QString, QString, int>> expected = {
+        {"basic", "Basic Plan", 2237},
+        {"preferred", "Preferred Plan", 2617},
+        {"junior-senior", "Junior/Senior Plan", 1536},
+        {"apartment", "Apartment Plan", 336},
+        {"grad", "Graduate Plan", 336},
+    };
+    for (int i = 0; i < plans.size(); ++i) {
+        CAPTURE(i);
+        CHECK(plans[i].id == std::get<0>(expected[i]));
+        CHECK(plans[i].name == std::get<1>(expected[i]));
+        CHECK(plans[i].startingPoints == std::get<2>(expected[i]));
+    }
+    // The same list every time, so pages can keep a reference to it.
+    CHECK(&LocalAccounts::diningPlans() == &plans);
+}
+
+// Author: Nathan Gu
+TEST_CASE("Every dining plan can be chosen at sign-up and starts at its points") {
+    TestAccountStore store;
+    int number = 0;
+    for (const auto &plan : LocalAccounts::diningPlans()) {
+        CAPTURE(plan.id.toStdString());
+        const auto created =
+            createAccount(QString("plan%1@scu.edu").arg(number++), "Planner", plan.id);
+        CHECK(created.diningPlanId == plan.id);
+        CHECK(created.balance == plan.startingPoints);
+    }
+}
 
 TEST_CASE("Sign-up details are validated before anything is saved") {
     TestAccountStore store;
