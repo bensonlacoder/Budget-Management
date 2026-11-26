@@ -2,9 +2,14 @@
 
 #include "balance.h"
 
+#include <array>
+
 // The referenced Balance must outlive Budget. Recommendations use its latest value.
 class Budget {
 public:
+    // Meals eaten on campus for each weekday, Monday first. 0 means not on campus.
+    using DiningHabits = std::array<int, 7>;
+
     // remainingDays counts today; 0 means the budgeting period has ended.
     // Throws std::invalid_argument if remainingDays is outside 0 through 90.
     Budget(const Balance &balance, int remainingDays);
@@ -15,18 +20,58 @@ public:
 
     int getRemainingDays() const;
 
-    // Recommended maximum spending per day: balance / remaining days, rounded down
-    // to the nearest hundredth so the advice never adds up to more than the balance.
-    // Returns the full balance when no days remain.
+    // Points to keep at the end of the quarter, excluded from the advice.
+    // Throws std::invalid_argument if points is negative, not finite, or larger
+    // than the balance. A rejected goal leaves the previous one in place.
+    void setReserveGoal(double points);
+
+    double getReserveGoal() const;
+
+    // Balance minus the reserve, never below 0 (the balance can fall later).
+    double getSpendablePoints() const;
+
+    // Recommended maximum spending per day: (balance - reserve) / remaining days,
+    // rounded down to the nearest hundredth so the advice never adds up to more than
+    // the spendable points. Returns the spendable points when no days remain.
     double getDailyBudget() const;
 
-    // Recommended maximum spending per week: balance * 7 / remaining days, rounded down
-    // to the nearest hundredth.
-    // Returns the full balance when fewer than 7 days remain, including 0.
+    // Recommended maximum spending per week: (balance - reserve) * 7 / remaining days,
+    // rounded down to the nearest hundredth.
+    // Returns the spendable points when fewer than 7 days remain, including 0.
     double getWeeklyBudget() const;
+
+    // Average net points spent per day over the recent spending window (SP-07).
+    // Throws std::invalid_argument if pointsPerDay is negative or not finite.
+    void setRecentSpendingRate(double pointsPerDay);
+
+    double getRecentSpendingRate() const;
+
+    // Balance projected to the end of the quarter at the recent spending rate.
+    double getProjectedEndBalance() const;
+
+    // True when the projection leaves fewer points than the reserve goal.
+    bool isProjectedBelowReserve() const;
+
+    // Throws std::invalid_argument if a meal count is outside 0 through 10.
+    void setDiningHabits(const DiningHabits &habits);
+
+    const DiningHabits &getDiningHabits() const;
+
+    // The numbers below count `getRemainingDays()` days starting at firstWeekday,
+    // using QDate::dayOfWeek (1 = Monday ... 7 = Sunday). An invalid weekday gives 0.
+    int getRemainingCampusDays(int firstWeekday) const;
+    int getRemainingCampusMeals(int firstWeekday) const;
+    // Spendable points per on-campus meal or campus day, rounded down.
+    // 0 when there are no habits or no campus days left.
+    double getPerMealBudget(int firstWeekday) const;
+    double getPerCampusDayBudget(int firstWeekday) const;
 
 private:
     const Balance &balance;
     int remainingDays;
+    double reserveGoal;
+    double recentSpendingRate;
+    DiningHabits habits;
     static constexpr int DAYS_PER_WEEK = 7;
+    static constexpr int MAX_MEALS_PER_DAY = 10;
 };
