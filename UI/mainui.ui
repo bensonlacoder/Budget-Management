@@ -16,8 +16,24 @@
     <item>
      <widget class="QLabel" name="titleLabel">
       <property name="font"><font><pointsize>18</pointsize><bold>true</bold></font></property>
-      <property name="text"><string>Dining Points Budget</string></property>
+      <property name="text"><string>Budget sandbox</string></property>
      </widget>
+    </item>
+    <item>
+     <layout class="QHBoxLayout" name="sandboxLayout">
+      <item>
+       <widget class="QLabel" name="sandboxLabel">
+        <property name="text"><string>Sandbox: changes here aren't saved. Correct your real balance and days left on the Profile tab.</string></property>
+        <property name="wordWrap"><bool>true</bool></property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="useRealNumbersButton">
+        <property name="toolTip"><string>Replace the numbers here with your saved balance and days left.</string></property>
+        <property name="text"><string>Use my real numbers</string></property>
+       </widget>
+      </item>
+     </layout>
     </item>
     <item>
      <widget class="QGroupBox" name="balanceGroupBox">
@@ -79,16 +95,10 @@
           <layout class="QHBoxLayout" name="remainingDaysLayout">
            <item>
             <widget class="QSpinBox" name="remainingDaysSpinBox">
-             <property name="toolTip"><string>Enter 0 to 90 days, including today. Use 0 when the budgeting period has ended. The count goes down by one each day.</string></property>
+             <property name="toolTip"><string>Try 0 to 90 days, including today. This doesn't change your real days left.</string></property>
              <property name="keyboardTracking"><bool>false</bool></property>
              <property name="minimum"><number>0</number></property>
              <property name="maximum"><number>2147483647</number></property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QPushButton" name="resetDaysButton">
-             <property name="toolTip"><string>Set days left back to the starting count for the quarter.</string></property>
-             <property name="text"><string>Reset days</string></property>
             </widget>
            </item>
           </layout>
@@ -107,12 +117,12 @@
   </widget>
  </widget>
  <tabstops>
+  <tabstop>useRealNumbersButton</tabstop>
   <tabstop>amountSpinBox</tabstop>
   <tabstop>setBalanceButton</tabstop>
   <tabstop>addPointsButton</tabstop>
   <tabstop>spendPointsButton</tabstop>
   <tabstop>remainingDaysSpinBox</tabstop>
-  <tabstop>resetDaysButton</tabstop>
  </tabstops>
  <resources/>
  <connections/>

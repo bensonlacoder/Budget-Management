@@ -1,29 +1,44 @@
-// Tests for the Budget tab's balance buttons and their error messages.
+// Tests for the Budget tab sandbox (T04): its balance buttons and error messages, and
+// that it starts from the real numbers but never saves anything.
 
 #include "doctest.h"
 #include "mainui.h"
+#include "test_account_store.h"
 
 #include <QApplication>
 #include <QDoubleSpinBox>
 #include <QLabel>
 #include <QPushButton>
 #include <QSpinBox>
+#include <QTabWidget>
 
 namespace {
+MainUI::RealNumbersLoader fixedNumbers(double balance, int days) {
+    return [balance, days] { return std::optional<MainUI::RealNumbers>({balance, days}); };
+}
+
 struct BudgetPage {
     MainUI &window;
     QDoubleSpinBox *amount = window.findChild<QDoubleSpinBox *>("amountSpinBox");
     QLabel *balance = window.findChild<QLabel *>("balanceValueLabel");
+    QLabel *daily = window.findChild<QLabel *>("dailyBudgetValueLabel");
+    QSpinBox *days = window.findChild<QSpinBox *>("remainingDaysSpinBox");
     QLabel *message = window.findChild<QLabel *>("errorLabel");
 
     explicit BudgetPage(MainUI &w) : window(w) {
         REQUIRE(amount);
         REQUIRE(balance);
+        REQUIRE(daily);
+        REQUIRE(days);
         REQUIRE(message);
     }
 
     void press(const char *button, double value) {
         amount->setValue(value);
+        click(button);
+    }
+
+    void click(const char *button) {
         auto *target = window.findChild<QPushButton *>(button);
         REQUIRE(target);
         target->click();
@@ -32,24 +47,20 @@ struct BudgetPage {
 }
 
 TEST_CASE("Budget tab balance buttons update the balance and report success") {
-    MainUI window;
+    MainUI window(fixedNumbers(0.0, 77));
     BudgetPage page(window);
-    double reported = -1.0;
-    QObject::connect(&window, &MainUI::balanceChanged, [&](double value) { reported = value; });
 
     page.press("setBalanceButton", 700);
     CHECK(page.balance->text() == "700.00 points");
     CHECK(page.message->text() == "Successfully Updated");
-    CHECK(reported == 700.0);
     page.press("addPointsButton", 50);
     CHECK(page.balance->text() == "750.00 points");
     page.press("spendPointsButton", 750);
     CHECK(page.balance->text() == "0.00 points");
-    CHECK(reported == 0.0);
 }
 
 TEST_CASE("Budget tab rejects overspending and blank amounts") {
-    MainUI window;
+    MainUI window(fixedNumbers(0.0, 77));
     BudgetPage page(window);
     page.press("setBalanceButton", 100);
 
@@ -58,13 +69,13 @@ TEST_CASE("Budget tab rejects overspending and blank amounts") {
     CHECK(page.message->text() == "Not enough points. Enter an amount no greater than your balance.");
 
     page.amount->clear();
-    window.findChild<QPushButton *>("addPointsButton")->click();
+    page.click("addPointsButton");
     CHECK(page.balance->text() == "100.00 points");
     CHECK(page.message->text() == "Enter an amount first.");
 }
 
 TEST_CASE("Budget tab can spend a displayed balance built from cents") {
-    MainUI window;
+    MainUI window(fixedNumbers(0.0, 77));
     BudgetPage page(window);
     page.press("setBalanceButton", 0.70);
     page.press("addPointsButton", 0.10);
@@ -74,133 +85,142 @@ TEST_CASE("Budget tab can spend a displayed balance built from cents") {
     CHECK(page.message->text() == "Successfully Updated");
 }
 
-TEST_CASE("A balance that cannot be saved is rolled back") {
-    double attemptedPrevious = -1.0;
-    double attemptedNext = -1.0;
-    MainUI window(50.0, [&](double previous, double next) {
-        attemptedPrevious = previous;
-        attemptedNext = next;
-        return false;
+// Author: Benson
+TEST_CASE("The sandbox starts from the real balance and days left") {
+    MainUI window(fixedNumbers(700.0, 35));
+    BudgetPage page(window);
+    CHECK(page.balance->text() == "700.00 points");
+    CHECK(page.days->value() == 35);
+    CHECK(page.daily->text() == "20.00 points");
+    CHECK(page.message->text().isEmpty());
+}
+
+// Author: Benson
+TEST_CASE("The sandbox shows that it isn't saved and has no Reset days button") {
+    MainUI window(fixedNumbers(0.0, 10));
+    auto *label = window.findChild<QLabel *>("sandboxLabel");
+    REQUIRE(label);
+    CHECK(label->text().startsWith("Sandbox: changes here aren't saved"));
+    CHECK(window.findChild<QPushButton *>("useRealNumbersButton"));
+    CHECK_FALSE(window.findChild<QPushButton *>("resetDaysButton"));
+}
+
+// Author: Benson
+TEST_CASE("Use my real numbers replaces sandbox changes with the real values") {
+    MainUI window(fixedNumbers(300.0, 30));
+    BudgetPage page(window);
+    page.press("spendPointsButton", 100);
+    page.days->setValue(5);
+    CHECK(page.balance->text() == "200.00 points");
+    CHECK(page.daily->text() == "40.00 points");
+
+    page.click("useRealNumbersButton");
+    CHECK(page.balance->text() == "300.00 points");
+    CHECK(page.days->value() == 30);
+    CHECK(page.daily->text() == "10.00 points");
+    CHECK(page.message->text() == "Showing your real balance and days left.");
+}
+
+// Author: Benson
+TEST_CASE("Opening the Budget tab reloads the latest real numbers") {
+    double realBalance = 100.0;
+    MainUI window([&] { return std::optional<MainUI::RealNumbers>({realBalance, 10}); });
+    BudgetPage page(window);
+    auto *purchases = new QWidget;
+    window.setPurchasePage(purchases);
+    window.addPage(new QWidget, "Profile");
+    auto *tabs = qobject_cast<QTabWidget *>(window.centralWidget());
+    REQUIRE(tabs);
+    REQUIRE(tabs->count() == 3);
+    CHECK(tabs->tabText(1) == "&Budget");
+
+    page.press("addPointsButton", 50); // Sandbox only.
+    realBalance = 80.0;                // For example, a purchase on another tab.
+    tabs->setCurrentIndex(2);
+    CHECK(page.balance->text() == "150.00 points"); // Not reloaded while away.
+    tabs->setCurrentIndex(1);
+    CHECK(page.balance->text() == "80.00 points");
+}
+
+// Author: Benson
+TEST_CASE("If the real numbers can't be loaded, the sandbox says so") {
+    bool fail = false;
+    MainUI window([&]() -> std::optional<MainUI::RealNumbers> {
+        if (fail) {
+            return std::nullopt;
+        }
+        return MainUI::RealNumbers{50.0, 5};
     });
     BudgetPage page(window);
+    fail = true;
+    page.click("useRealNumbersButton");
     CHECK(page.balance->text() == "50.00 points");
-
-    page.press("setBalanceButton", 80);
-    CHECK(attemptedPrevious == 50.0);
-    CHECK(attemptedNext == 80.0);
-    CHECK(page.balance->text() == "50.00 points");
-    CHECK(page.message->text() == "Could not save the balance. Try again or sign in again to reload it.");
+    CHECK(page.message->text() == "Could not load your real numbers. Try again.");
 }
 
-TEST_CASE("Balances saved from the Purchases tab refresh the Budget tab") {
-    MainUI window(200.0, [](double, double) { return true; });
-    BudgetPage page(window);
-    window.showSavedBalance(187.5);
-    CHECK(page.balance->text() == "187.50 points");
-    CHECK(window.findChild<QLabel *>("dailyBudgetValueLabel")->text() == "2.43 points");
+// Author: Benson
+TEST_CASE("Out-of-range real days are kept within the sandbox's limits") {
+    MainUI window(fixedNumbers(90.0, 500));
+    CHECK(BudgetPage(window).days->value() == 90);
 }
 
-TEST_CASE("Days left start from the saved value and each change is saved") {
-    QList<int> saved;
-    MainUI window(700.0, {}, 35, [&](int days) {
-        saved.append(days);
-        return true;
+// Author: Benson
+TEST_CASE("Nothing done in the sandbox is saved to the account") {
+    TestAccountStore store;
+    const auto created = store.createVerified("sandbox@scu.edu", "Sandbox");
+    const QString account = created.accountId;
+    REQUIRE_FALSE(account.isEmpty());
+    double balance = 0.0;
+    REQUIRE(LocalAccounts::correctBalance(account, LocalAccounts::CorrectionMode::Set, 400.0,
+                                          balance)
+            == LocalAccounts::Result::Success);
+    QList<LocalAccounts::HistoryEntry> historyBefore;
+    REQUIRE(LocalAccounts::loadHistory(account, historyBefore));
+
+    MainUI window([account]() -> std::optional<MainUI::RealNumbers> {
+        LocalAccounts::Profile saved;
+        if (!LocalAccounts::loadProfile(account, saved)) {
+            return std::nullopt;
+        }
+        return MainUI::RealNumbers{saved.balance, 20};
     });
-    auto *days = window.findChild<QSpinBox *>("remainingDaysSpinBox");
-    auto *daily = window.findChild<QLabel *>("dailyBudgetValueLabel");
-    REQUIRE(days);
-    REQUIRE(daily);
-    CHECK(days->value() == 35);
-    CHECK(daily->text() == "20.00 points");
-    CHECK(saved.isEmpty()); // Loading the saved value does not save it again.
+    BudgetPage page(window);
+    CHECK(page.balance->text() == "400.00 points");
 
-    days->setValue(14);
-    CHECK(saved == QList<int>{14});
-    CHECK(daily->text() == "50.00 points");
+    page.press("setBalanceButton", 900);
+    page.press("addPointsButton", 10);
+    page.press("spendPointsButton", 500);
+    page.days->setValue(3);
+    CHECK(page.balance->text() == "410.00 points");
 
-    days->setValue(91); // Rejected by the budget, so nothing is saved.
-    CHECK(days->value() == 14);
-    CHECK(saved == QList<int>{14});
-}
-
-TEST_CASE("Days left that cannot be saved are rolled back") {
-    MainUI window(700.0, {}, MainUI::DefaultRemainingDays, [](int) { return false; });
-    auto *days = window.findChild<QSpinBox *>("remainingDaysSpinBox");
-    REQUIRE(days);
-    days->setValue(10);
-    CHECK(days->value() == 77);
-    CHECK(window.findChild<QLabel *>("dailyBudgetValueLabel")->text() == "9.09 points");
-    CHECK(window.findChild<QLabel *>("errorLabel")->text()
-          == "Could not save the days left. Your previous day count has been kept.");
-}
-
-TEST_CASE("An out-of-range saved day count falls back to the default") {
-    MainUI window(700.0, {}, 500);
-    CHECK(window.findChild<QSpinBox *>("remainingDaysSpinBox")->value() == MainUI::DefaultRemainingDays);
-}
-
-TEST_CASE("New windows start with 77 days left") {
-    MainUI window;
-    CHECK(MainUI::DefaultRemainingDays == 77);
-    CHECK(window.findChild<QSpinBox *>("remainingDaysSpinBox")->value() == 77);
+    LocalAccounts::Profile saved;
+    REQUIRE(LocalAccounts::loadProfile(account, saved));
+    CHECK(saved.balance == 400.0);
+    CHECK_FALSE(saved.daysCorrected);
+    QList<LocalAccounts::HistoryEntry> historyAfter;
+    REQUIRE(LocalAccounts::loadHistory(account, historyAfter));
+    CHECK(historyAfter.size() == historyBefore.size());
 }
 
 TEST_CASE("Days left count down when the date changes while the app is open") {
-    QList<int> saved;
-    MainUI window(700.0, {}, 10, [&](int days) {
-        saved.append(days);
-        return true;
-    });
-    auto *days = window.findChild<QSpinBox *>("remainingDaysSpinBox");
-    auto *daily = window.findChild<QLabel *>("dailyBudgetValueLabel");
+    MainUI window(fixedNumbers(700.0, 10));
+    BudgetPage page(window);
     const QDate today = QDate::currentDate();
 
     window.showDate(today); // Same day: no change.
-    CHECK(days->value() == 10);
+    CHECK(page.days->value() == 10);
 
     window.showDate(today.addDays(1));
-    CHECK(days->value() == 9);
-    CHECK(daily->text() == "77.77 points");
+    CHECK(page.days->value() == 9);
+    CHECK(page.daily->text() == "77.77 points");
 
     window.showDate(today.addDays(4));
-    CHECK(days->value() == 6);
+    CHECK(page.days->value() == 6);
 
     window.showDate(today.addDays(2)); // A clock moved backwards never adds days.
-    CHECK(days->value() == 6);
+    CHECK(page.days->value() == 6);
 
     window.showDate(today.addDays(30)); // Never drops below 0.
-    CHECK(days->value() == 0);
-    CHECK(daily->text() == "700.00 points");
-    // The saved count and its date already produce this value at sign-in.
-    CHECK(saved.isEmpty());
-}
-
-TEST_CASE("Reset days returns to the starting count and saves it") {
-    QList<int> saved;
-    MainUI window(700.0, {}, 20, [&](int days) {
-        saved.append(days);
-        return true;
-    });
-    auto *days = window.findChild<QSpinBox *>("remainingDaysSpinBox");
-    auto *reset = window.findChild<QPushButton *>("resetDaysButton");
-    auto *message = window.findChild<QLabel *>("errorLabel");
-    REQUIRE(reset);
-
-    reset->click();
-    CHECK(days->value() == 77);
-    CHECK(saved == QList<int>{77});
-    CHECK(message->text() == "Days left reset to 77.");
-
-    // Resetting when already at 77 still saves, which restarts the countdown today.
-    reset->click();
-    CHECK(saved == QList<int>{77, 77});
-}
-
-TEST_CASE("A reset that cannot be saved keeps the previous day count") {
-    MainUI window(700.0, {}, 20, [](int) { return false; });
-    auto *days = window.findChild<QSpinBox *>("remainingDaysSpinBox");
-    window.findChild<QPushButton *>("resetDaysButton")->click();
-    CHECK(days->value() == 20);
-    CHECK(window.findChild<QLabel *>("errorLabel")->text()
-          == "Could not save the days left. Your previous day count has been kept.");
+    CHECK(page.days->value() == 0);
+    CHECK(page.daily->text() == "700.00 points");
 }

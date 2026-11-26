@@ -1,13 +1,18 @@
 #include "authdialog.h"
+#include "chartspage.h"
 #include "friendsdialog.h"
 #include "mainui.h"
 #include "menusearchdialog.h"
+#include "planpage.h"
+#include "profilepage.h"
 #include "purchasespage.h"
 
 #include <QAction>
 #include <QApplication>
 #include <QMenu>
 #include <QMenuBar>
+
+#include <optional>
 
 int main(int argc, char *argv[]) {
     QApplication app(argc, argv);
@@ -20,19 +25,35 @@ int main(int argc, char *argv[]) {
     QObject::connect(&auth, &QDialog::accepted, &app, [&auth] {
         const QString accountName = auth.accountName();
         const auto profile = auth.profile();
-        auto *window = new MainUI(
-            profile.balance,
-            [accountName](double previous, double next) {
-                return LocalAccounts::saveBalance(accountName, previous, next);
-            },
-            profile.remainingDays,
-            [accountName](int days) { return LocalAccounts::saveRemainingDays(accountName, days); });
+        // The Budget tab is a sandbox: it only reads the real numbers, never saves them.
+        auto *window = new MainUI([accountName]() -> std::optional<MainUI::RealNumbers> {
+            LocalAccounts::Profile saved;
+            if (!LocalAccounts::loadProfile(accountName, saved)) {
+                return std::nullopt;
+            }
+            return MainUI::RealNumbers{saved.balance, ProfilePage::daysLeftFor(saved)};
+        });
         window->setAttribute(Qt::WA_DeleteOnClose);
         auto *purchases = new PurchasesPage(accountName, window);
-        QObject::connect(purchases, &PurchasesPage::balanceUpdated, window, &MainUI::showSavedBalance);
-        QObject::connect(window, &MainUI::balanceChanged, purchases, &PurchasesPage::showBalance);
         purchases->showBalance(profile.balance);
         window->setPurchasePage(purchases);
+        auto *plan = new PlanPage(accountName, window);
+        auto *charts = new ChartsPage(accountName, window);
+        auto *profilePage = new ProfilePage(accountName, window);
+        window->addPage(plan, QObject::tr("P&lan"));
+        window->addPage(charts, QObject::tr("&Charts"));
+        window->addPage(profilePage, QObject::tr("P&rofile"));
+
+        // Keep every page showing the real balance after a change on another tab.
+        QObject::connect(purchases, &PurchasesPage::balanceUpdated, plan, &PlanPage::refresh);
+        QObject::connect(purchases, &PurchasesPage::balanceUpdated, charts, &ChartsPage::refresh);
+        QObject::connect(purchases, &PurchasesPage::balanceUpdated, profilePage,
+                         &ProfilePage::refresh);
+        QObject::connect(profilePage, &ProfilePage::balanceUpdated, purchases,
+                         &PurchasesPage::showBalance);
+        QObject::connect(profilePage, &ProfilePage::balanceUpdated, plan, &PlanPage::refresh);
+        QObject::connect(profilePage, &ProfilePage::balanceUpdated, charts, &ChartsPage::refresh);
+        QObject::connect(profilePage, &ProfilePage::daysUpdated, plan, &PlanPage::refresh);
         auto *accountMenu = window->menuBar()->addMenu(QObject::tr("&Account"));
         auto *friends = accountMenu->addAction(QObject::tr("&Friends"));
         QObject::connect(friends, &QAction::triggered, window,

@@ -8,6 +8,7 @@
 #include "budget.h"
 
 #include <functional>
+#include <optional>
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -15,29 +16,37 @@ class MainUI;
 }
 QT_END_NAMESPACE
 
+class QTabWidget;
+
+// The main window. Its Budget tab is a sandbox (T04): it starts from the real balance
+// and days left, but nothing changed there is saved or seen by friends.
 class MainUI : public QMainWindow {
     Q_OBJECT
 
 public:
-    explicit MainUI(QWidget *parent = nullptr);
-    // Days left at the start of the quarter; Reset days returns to this count.
-    static constexpr int DefaultRemainingDays = 77;
+    struct RealNumbers {
+        double balance;
+        int days;
+    };
+    // Returns the saved balance and days left, or nothing if they can't be read.
+    using RealNumbersLoader = std::function<std::optional<RealNumbers>()>;
 
-    // saveBalance(previous, next) and saveRemainingDays(days) return false if the
-    // value could not be saved; the change is then undone. Either may be empty.
-    // An out-of-range startingDays falls back to DefaultRemainingDays.
-    MainUI(double startingBalance, std::function<bool(double, double)> saveBalance,
-           int startingDays = DefaultRemainingDays,
-           std::function<bool(int)> saveRemainingDays = {}, QWidget *parent = nullptr);
+    // Without a loader, the real numbers are 0 points and the quarter calendar's days.
+    explicit MainUI(QWidget *parent = nullptr);
+    explicit MainUI(RealNumbersLoader loadRealNumbers, QWidget *parent = nullptr);
     ~MainUI() override;
+
+    // Puts the Purchases tab first and the Budget tab second.
     void setPurchasePage(QWidget *page);
-    void showSavedBalance(double points);
+    // Adds a tab after the existing ones. Call setPurchasePage first.
+    void addPage(QWidget *page, const QString &title);
+    // Replaces the sandbox numbers with the real ones. Opening the Budget tab and the
+    // "Use my real numbers" button both call this. Returns false, keeping the sandbox
+    // numbers, if the real ones can't be loaded.
+    bool useRealNumbers();
     // Counts days left down by one for each day from the last date shown to `today`.
     // A timer calls this with the current date so the count drops at midnight.
     void showDate(const QDate &today);
-
-signals:
-    void balanceChanged(double points);
 
 private:
     bool eventFilter(QObject *watched, QEvent *event) override;
@@ -46,9 +55,8 @@ private:
     void addPoints();
     void spendPoints();
     bool updateRemainingDays(int days);
-    void resetRemainingDays();
     bool validateAmount();
-    void finishBalanceUpdate(double previousBalance);
+    void finishBalanceUpdate();
     void refreshDisplay();
     static QString formatPoints(double points);
 
@@ -56,8 +64,9 @@ private:
     Balance balance;
     Budget budget;
     Ui::MainUI *ui;
-    std::function<bool(double, double)> saveBalance;
-    std::function<bool(int)> saveRemainingDays;
+    RealNumbersLoader loadRealNumbers;
+    QTabWidget *pages = nullptr;
+    QWidget *budgetPage = nullptr;
     QDate shownDate;
 };
 #endif // MAINUI_H

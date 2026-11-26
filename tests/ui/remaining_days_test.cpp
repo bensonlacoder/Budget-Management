@@ -12,7 +12,8 @@
 #include "mainui.h"
 
 TEST_CASE("Invalid day entry explains the limit and preserves the budget") {
-    MainUI window;
+    // The sandbox starts from 0 points and 77 days.
+    MainUI window([] { return std::optional<MainUI::RealNumbers>({0.0, 77}); });
     window.show();
     auto *days = window.findChild<QSpinBox *>("remainingDaysSpinBox");
     auto *error = window.findChild<QLabel *>("errorLabel");

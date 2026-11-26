@@ -20,10 +20,15 @@ set(PURCHASE_SOURCES UI/purchasespage.cpp UI/purchasespage.h UI/scumenu.cpp UI/s
     UI/lunchcatalog.cpp UI/localaccounts.cpp UI/localaccounts.h
     UI/emailsender.cpp UI/emailsender.h UI/menusearchdialog.cpp UI/menusearchdialog.h)
 
-add_executable(app ${APP_SOURCES} UI/main.cpp UI/mainui.cpp UI/mainui.h UI/mainui.ui
+# Main window and tab pages, shared by the app and the UI tests.
+set(PAGE_SOURCES UI/mainui.cpp UI/mainui.h UI/mainui.ui
     UI/authdialog.cpp UI/authdialog.h
     UI/friendsdialog.cpp UI/friendsdialog.h
-    ${PURCHASE_SOURCES})
+    UI/planpage.cpp UI/planpage.h
+    UI/chartspage.cpp UI/chartspage.h
+    UI/profilepage.cpp UI/profilepage.h)
+
+add_executable(app ${APP_SOURCES} UI/main.cpp ${PAGE_SOURCES} ${PURCHASE_SOURCES})
 target_link_libraries(app PRIVATE Qt6::Widgets Qt6::Sql Qt6::Network)
 target_include_directories(app PRIVATE src UI)
 
@@ -39,10 +44,7 @@ add_test(NAME test_build COMMAND test_build)
 # Exercise the Qt widgets, saved accounts and menu parsing. Every tests/ui/*.cpp
 # file is included; remaining_days_test.cpp supplies main() with a QApplication.
 file(GLOB UI_TEST_SOURCES CONFIGURE_DEPENDS tests/ui/*.cpp)
-add_executable(ui_tests ${UI_TEST_SOURCES}
-    ${PURCHASE_SOURCES} ${APP_SOURCES}
-    UI/authdialog.cpp UI/authdialog.h
-    UI/mainui.cpp UI/mainui.h UI/mainui.ui)
+add_executable(ui_tests ${UI_TEST_SOURCES} ${PURCHASE_SOURCES} ${APP_SOURCES} ${PAGE_SOURCES})
 target_link_libraries(ui_tests PRIVATE Qt6::Widgets Qt6::Test Qt6::Network Qt6::Sql)
 target_include_directories(ui_tests PRIVATE src UI tests)
 add_test(NAME ui_tests COMMAND ui_tests)

@@ -9,7 +9,8 @@
 #include "mainui.h"
 
 TEST_CASE("Balance buttons update the displayed balance and recommendations") {
-    MainUI window;
+    // Start the sandbox from 0 points and 77 days so the expected advice is fixed.
+    MainUI window([] { return std::optional<MainUI::RealNumbers>({0.0, 77}); });
     window.show();
     auto *amount = window.findChild<QDoubleSpinBox *>("amountSpinBox");
     auto *setBalance = window.findChild<QPushButton *>("setBalanceButton");
@@ -33,7 +34,7 @@ TEST_CASE("Balance buttons update the displayed balance and recommendations") {
     CHECK(balance->text() == "0.00 points");
     CHECK(daily->text() == "0.00 points");
     CHECK(weekly->text() == "0.00 points");
-    CHECK(days->value() == MainUI::DefaultRemainingDays); // 77
+    CHECK(days->value() == 77);
 
     amount->setValue(700.0);
     QTest::mouseClick(setBalance, Qt::LeftButton);

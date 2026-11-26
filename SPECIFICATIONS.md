@@ -48,7 +48,7 @@ balance immediately after each rejected operation.
 **UI test:** set 700 points, then try to spend 701. The app shows the
 insufficient-points message and preserves the displayed balance and both
 recommendations. Spending 70 afterward succeeds, showing 630 points, 8.18 per day,
-and 57.27 for the next 7 days with the default 77 days remaining.
+and 57.27 for the next 7 days with 77 days remaining.
 
 ## SP-04: Recommend daily and weekly spending
 
@@ -56,8 +56,10 @@ and 57.27 for the next 7 days with the default 77 days remaining.
 
 Remaining days counts today and must be a whole number from 0 to 90, inclusive.
 Zero days means the budgeting period has ended.
-The app starts with 77 remaining days. The count goes down by one each day, including
-while the app is open, and never below 0. **Reset days** sets it back to 77 and saves it. Typed day counts are validated when the
+The days remaining come from the quarter calendar (SP-05), or from a manual
+correction on the Profile tab. The count goes down by one each day, including
+while the app is open, and never below 0. On the Budget tab, which is a sandbox
+(SP-06), typed day counts are validated when the
 user presses Enter or leaves the field; arrow adjustments are validated immediately.
 If the user enters more than 90 days, the app restores the previous day count,
 keeps the existing recommendations, and displays `Remaining days must be between
@@ -87,11 +89,57 @@ Independently, spending 70 from 700 updates them to 9 per day and 63 per week.
 days throws. Constructing with 90 days and updating from 30 to 90 days both
 succeed and produce recommendations based on the new day count.
 
-**Balance UI cases:** verify the initial `0.00 points` display and default 77
-days. Setting, adding, and spending update the balance and recommendations with
+**Balance UI cases:** starting the sandbox from 0 points and 77 days, verify the
+initial `0.00 points` display. Setting, adding, and spending update the balance and recommendations with
 two decimal places. Setting replaces an existing balance; spending the entire
 balance leaves all three displayed point amounts at zero.
 
 **UI regression test:** enter 91 or 366 days. The app shows the range message,
 retains the previous day count and recommendations, and remains usable. Entering
 90 afterward succeeds and clears the error.
+
+## SP-05: Quarter calendar and days remaining
+
+**Requirements:** FR-05, FR-22, FR-39
+
+Days remaining are calculated from SCU's 2026–27 undergraduate calendar, from
+the first day of classes through the last day of finals, counting both:
+
+| Quarter | Start | End | Length |
+| --- | --- | --- | --- |
+| Fall 2026 | 2026-09-21 | 2026-12-11 | 82 days |
+| Winter 2027 | 2027-01-04 | 2027-03-19 | 75 days |
+| Spring 2027 | 2027-03-30 | 2027-06-10 | 73 days |
+
+Source: SCU Undergraduate Bulletin 2026–27. Spring's start differs by one day
+between SCU sources; March 30 is used. The dates live in `src/quarter.cpp`.
+
+- During a quarter, days remaining are the days from today through the last day
+  of finals, counting today. On 2026-11-22 that is 20.
+- Between quarters, days remaining are the next quarter's full length, and the
+  Profile tab shows the date it starts. On 2026-12-20 that is Winter's 75.
+- After the last listed quarter, the Profile tab says the calendar needs
+  updating, and the app uses the saved day count until the user corrects it.
+- A manual correction from the Profile tab (**Correct days**, 0 to 90) takes
+  priority over the calendar and goes down by one each day. **Reset days** clears
+  it and returns to the calendar value. Reset is unavailable when there is no
+  correction or the calendar has ended.
+
+**Test cases:** the first day of Winter gives 75 and its last day gives 1;
+2026-12-12 and 2026-12-20 are breaks before Winter; 2027-06-11 reports that the
+calendar has ended; a correction of 40 on 2026-11-22 gives 40 instead of 20.
+
+## SP-06: Budget tab sandbox
+
+**Requirements:** FR-36
+
+The Budget tab starts from the real balance and days remaining each time it is
+opened, and **Use my real numbers** reloads them. Set, Add, Spend and day
+changes there update only that tab's recommendations; nothing is saved, added to
+history, or shown to friends. The tab is labelled `Sandbox: changes here aren't
+saved`, and it has no Reset days button. Real corrections are made on the
+Profile tab.
+
+**Test cases:** after Set, Add, Spend and a day change on the Budget tab, the
+saved balance, days correction and history are unchanged. **Use my real
+numbers** restores the real balance and days after sandbox changes.

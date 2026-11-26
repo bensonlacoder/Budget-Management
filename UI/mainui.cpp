@@ -1,6 +1,8 @@
 #include "mainui.h"
 #include "ui_mainui.h"
 
+#include "quarter.h"
+
 #include <QEvent>
 #include <QSignalBlocker>
 #include <QTabWidget>
@@ -13,27 +15,25 @@
 namespace {
 constexpr int POINT_DECIMAL_PLACES = 2;
 constexpr int DATE_CHECK_INTERVAL_MS = 60 * 1000;
+constexpr int MAX_REMAINING_DAYS = 90; // Budget's upper limit.
+
+std::optional<MainUI::RealNumbers> noSavedNumbers() {
+    return MainUI::RealNumbers{0.0, Quarter::daysLeft(QDate::currentDate(), false, 0)};
+}
 }
 
-MainUI::MainUI(QWidget *parent)
-    : MainUI(0.0, {}, DefaultRemainingDays, {}, parent) {}
+MainUI::MainUI(QWidget *parent) : MainUI(RealNumbersLoader(noSavedNumbers), parent) {}
 
-MainUI::MainUI(double startingBalance, std::function<bool(double, double)> saveBalance,
-               int startingDays, std::function<bool(int)> saveRemainingDays, QWidget *parent)
-    : QMainWindow(parent), balance(startingBalance), budget(balance, DefaultRemainingDays),
-      ui(new Ui::MainUI), saveBalance(std::move(saveBalance)),
-      saveRemainingDays(std::move(saveRemainingDays)), shownDate(QDate::currentDate()) {
-    try {
-        budget.setRemainingDays(startingDays);
-    } catch (const std::invalid_argument &) {
-        // Keep the default if a saved value is out of range.
-    }
+MainUI::MainUI(RealNumbersLoader loadRealNumbers, QWidget *parent)
+    : QMainWindow(parent), budget(balance, 0), ui(new Ui::MainUI),
+      loadRealNumbers(loadRealNumbers ? std::move(loadRealNumbers) : noSavedNumbers),
+      shownDate(QDate::currentDate()) {
     ui->setupUi(this);
     ui->amountSpinBox->installEventFilter(this);
-    ui->remainingDaysSpinBox->setValue(budget.getRemainingDays());
+    budgetPage = centralWidget();
 
     connectControls();
-    refreshDisplay();
+    useRealNumbers();
 
     auto *clock = new QTimer(this);
     connect(clock, &QTimer::timeout, this, [this] { showDate(QDate::currentDate()); });
@@ -45,17 +45,47 @@ MainUI::~MainUI() {
 }
 
 void MainUI::setPurchasePage(QWidget *page) {
-    auto *budgetPage = takeCentralWidget();
-    auto *pages = new QTabWidget(this);
+    takeCentralWidget();
+    pages = new QTabWidget(this);
     pages->addTab(page, tr("&Purchases"));
     pages->addTab(budgetPage, tr("&Budget"));
+    // The sandbox starts over from the real numbers each time the tab is opened.
+    connect(pages, &QTabWidget::currentChanged, this, [this](int index) {
+        if (pages->widget(index) == budgetPage) {
+            useRealNumbers();
+        }
+    });
     setCentralWidget(pages);
     resize(750, 640);
 }
 
-void MainUI::showSavedBalance(double points) {
-    balance.setBalance(points);
+void MainUI::addPage(QWidget *page, const QString &title) {
+    if (pages) {
+        pages->addTab(page, title);
+    }
+}
+
+bool MainUI::useRealNumbers() {
+    const std::optional<RealNumbers> real = loadRealNumbers();
+    if (!real) {
+        ui->errorLabel->setText(tr("Could not load your real numbers. Try again."));
+        return false;
+    }
+    try {
+        balance.setBalance(real->balance);
+        budget.setRemainingDays(std::clamp(real->days, 0, MAX_REMAINING_DAYS));
+    } catch (const std::invalid_argument &) {
+        ui->errorLabel->setText(tr("Could not load your real numbers. Try again."));
+        return false;
+    }
+    shownDate = QDate::currentDate();
+    {
+        const QSignalBlocker blocker(ui->remainingDaysSpinBox);
+        ui->remainingDaysSpinBox->setValue(budget.getRemainingDays());
+    }
+    ui->amountSpinBox->setValue(0.0);
     refreshDisplay();
+    return true;
 }
 
 void MainUI::showDate(const QDate &today) {
@@ -65,8 +95,6 @@ void MainUI::showDate(const QDate &today) {
     const qint64 passed = shownDate.daysTo(today);
     shownDate = today;
     const int days = static_cast<int>(std::max<qint64>(0, budget.getRemainingDays() - passed));
-    // The saved count and its date already give this value at the next sign-in,
-    // so nothing needs to be saved here.
     budget.setRemainingDays(days);
     const QSignalBlocker blocker(ui->remainingDaysSpinBox);
     ui->remainingDaysSpinBox->setValue(days);
@@ -87,25 +115,27 @@ void MainUI::connectControls() {
     connect(ui->spendPointsButton, &QPushButton::clicked, this, &MainUI::spendPoints);
     connect(ui->remainingDaysSpinBox, &QSpinBox::valueChanged,
             this, &MainUI::updateRemainingDays);
-    connect(ui->resetDaysButton, &QPushButton::clicked, this, &MainUI::resetRemainingDays);
+    connect(ui->useRealNumbersButton, &QPushButton::clicked, this, [this] {
+        if (useRealNumbers()) {
+            ui->errorLabel->setText(tr("Showing your real balance and days left."));
+        }
+    });
 }
 
 void MainUI::setBalance() {
     if (!validateAmount()) {
         return;
     }
-    const double previous = balance.getBalance();
     balance.setBalance(ui->amountSpinBox->value());
-    finishBalanceUpdate(previous);
+    finishBalanceUpdate();
 }
 
 void MainUI::addPoints() {
     if (!validateAmount()) {
         return;
     }
-    const double previous = balance.getBalance();
     balance.add(ui->amountSpinBox->value());
-    finishBalanceUpdate(previous);
+    finishBalanceUpdate();
 }
 
 void MainUI::spendPoints() {
@@ -113,9 +143,8 @@ void MainUI::spendPoints() {
         return;
     }
     try {
-        const double previous = balance.getBalance();
         balance.subtract(ui->amountSpinBox->value());
-        finishBalanceUpdate(previous);
+        finishBalanceUpdate();
     } catch (const std::invalid_argument &) {
         ui->errorLabel->setText(
             tr("Not enough points. Enter an amount no greater than your balance."));
@@ -123,36 +152,18 @@ void MainUI::spendPoints() {
 }
 
 bool MainUI::updateRemainingDays(int days) {
-    const int previous = budget.getRemainingDays();
-    QString error;
     try {
         budget.setRemainingDays(days);
-        if (!saveRemainingDays || saveRemainingDays(days)) {
-            refreshDisplay();
-            return true;
-        }
-        budget.setRemainingDays(previous);
-        error = tr("Could not save the days left. Your previous day count has been kept.");
+        refreshDisplay();
+        return true;
     } catch (const std::invalid_argument &) {
-        error = tr("Remaining days must be between 0 and 90, including today. "
-                   "Your previous day count has been kept.");
     }
     // Restore the last valid value without triggering another update.
     const QSignalBlocker blocker(ui->remainingDaysSpinBox);
     ui->remainingDaysSpinBox->setValue(budget.getRemainingDays());
-    ui->errorLabel->setText(error);
+    ui->errorLabel->setText(tr("Remaining days must be between 0 and 90, including today. "
+                               "Your previous day count has been kept."));
     return false;
-}
-
-void MainUI::resetRemainingDays() {
-    {
-        // Update once below, even when the box already shows the starting count.
-        const QSignalBlocker blocker(ui->remainingDaysSpinBox);
-        ui->remainingDaysSpinBox->setValue(DefaultRemainingDays);
-    }
-    if (updateRemainingDays(DefaultRemainingDays)) {
-        ui->errorLabel->setText(tr("Days left reset to %1.").arg(DefaultRemainingDays));
-    }
 }
 
 bool MainUI::validateAmount() {
@@ -163,12 +174,7 @@ bool MainUI::validateAmount() {
     return true;
 }
 
-void MainUI::finishBalanceUpdate(double previousBalance) {
-    if (saveBalance && !saveBalance(previousBalance, balance.getBalance())) {
-        balance.setBalance(previousBalance);
-        ui->errorLabel->setText(tr("Could not save the balance. Try again or sign in again to reload it."));
-        return;
-    }
+void MainUI::finishBalanceUpdate() {
     refreshDisplay();
     ui->amountSpinBox->setValue(0.0);
     ui->amountSpinBox->setFocus();
@@ -181,7 +187,6 @@ void MainUI::refreshDisplay() {
     ui->dailyBudgetValueLabel->setText(formatPoints(budget.getDailyBudget()));
     ui->weeklyBudgetValueLabel->setText(formatPoints(budget.getWeeklyBudget()));
     ui->errorLabel->clear();
-    emit balanceChanged(balance.getBalance());
 }
 
 QString MainUI::formatPoints(double points) {
