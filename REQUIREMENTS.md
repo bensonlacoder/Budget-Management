@@ -7,11 +7,11 @@
 | ID | Requirement |
 | --- | --- |
 | ✅ FR-01 | View the current dining-point balance. |
-| FR-10 | View purchase and refund history and filter it by date range or dining location. |
+| ✅ FR-10 | View purchase and refund history and filter it by date range or dining location. |
 | ✅ FR-11 | Open an individual purchase to see its date, location, and points spent. |
-| FR-12 | View daily and weekly spending charts that reflect recorded purchases and refunds. |
-| FR-13 | See how many points were spent at each dining location for a selected date range. |
-| FR-14 | Compare actual daily and weekly spending with the budget for the same period and see how far over or under budget it is. |
+| ✅ FR-12 | View daily and weekly spending charts that reflect recorded purchases and refunds. |
+| ✅ FR-13 | See how many points were spent at each dining location for a selected date range. |
+| ✅ FR-14 | Compare actual daily and weekly spending with the budget for the same period and see how far over or under budget it is. |
 | ✅ FR-15 | See when the balance and purchase history were last successfully updated. |
 | ✅ FR-16 | See the current spending plan from the main budget view, including daily and weekly recommendations and time remaining in the quarter. |
 
@@ -52,10 +52,10 @@
 | ✅ FR-08 | Get an error when entering an invalid amount or day count, or trying to spend more points than are available. Keep the previously saved values after a rejected entry. |
 | ✅ FR-09 | Enter and save several point amounts in succession. After each successful entry, see confirmation and have the amount field ready for the next entry. |
 | ✅ FR-31 | Record a purchase manually with its date, location, and points spent, and see the new balance. |
-| FR-32 | Record a full or partial refund, associate it with the original purchase when available, and see the returned points reflected in the balance and spending totals. |
-| FR-33 | Correct or remove a manual purchase or refund and see the resulting changes to the balance, charts, and budget advice. |
+| ✅ FR-32 | Record a full or partial refund, associate it with the original purchase when available, and see the returned points reflected in the balance and spending totals. |
+| ✅ FR-33 | Correct or remove a manual purchase or refund and see the resulting changes to the balance, charts, and budget advice. |
 | ✅ FR-36 | Try different point balances, days remaining, and spending plans in a sandbox that starts from the real values and never changes the saved balance, purchase history, or balance shared with friends. |
-| FR-47 | Correct the real balance from the profile page by setting, adding, or subtracting points. Each correction appears in history as a balance correction, and a correction that lowers the balance counts as unlogged spending in charts and totals. |
+| ✅ FR-47 | Correct the real balance from the profile page by setting, adding, or subtracting points. Each correction appears in history as a balance correction, and a correction that lowers the balance counts as unlogged spending in charts and totals. |
 | ✅ FR-37 | Enter how many points to keep in reserve at the end of the quarter. |
 | ✅ FR-38 | Enter or upload usual dining habits, including which days they eat on campus and how many meals they eat on those days. |
 
