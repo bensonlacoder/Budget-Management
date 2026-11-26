@@ -6,7 +6,8 @@ of freedom regarding how they plan to budget their Dining Points.
 
 Current features include: local accounts with a dining plan, logging purchases from
 SCU menus or a receipt, purchase history, friends who can see each other's balance,
-and daily/weekly spending recommendations. Accounts, balances and purchases are saved
+and daily/weekly spending recommendations on the Plan tab, with a reserve goal and a
+warning when recent spending would leave less than the reserve. Accounts, balances and purchases are saved
 on this computer between sessions.
 
 See [REQUIREMENTS.md](REQUIREMENTS.md) for its scope and acceptance criteria, and
@@ -214,7 +215,9 @@ again to confirm a passing run. Keep the submitted application branch passing.
 ## Project structure
 
 - `src/balance.h` and `src/balance.cpp`: store points and reject invalid balance changes.
-- `src/budget.h` and `src/budget.cpp`: calculate recommendations from the balance and days left.
+- `src/budget.h` and `src/budget.cpp`: calculate recommendations from the balance, days
+  left, reserve goal and dining habits, and project the end-of-quarter balance.
+- `UI/planpage.*`: the Plan tab; shows the real advice and saves the reserve goal.
 - `UI/mainui.h` and `UI/mainui.cpp`: connect user actions to the models and update the display.
 - `UI/mainui.ui`: define the layout; edit it in Qt Designer.
 - `UI/main.cpp`: show sign-in, then build the main window, tabs and Account menu.

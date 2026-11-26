@@ -74,6 +74,8 @@ remaining-day count unchanged.
 - Next 7 days = current balance x 7 / remaining days, rounded down the same way, or the whole
   balance if fewer than 7 days remain, including 0.
 - Recommendations use the latest balance and update when the balance or days change.
+- When a reserve goal is set (SP-07), "balance" in these rules means the spendable
+  points: balance minus the reserve, never below 0.
 
 **Test case:** with 700 points and 70 days, per day is 10 and next 7 days is 70.
 Change to 3 days: next 7 days becomes 700. Values of 0, 1, and 90 days are accepted.
@@ -143,3 +145,53 @@ Profile tab.
 **Test cases:** after Set, Add, Spend and a day change on the Budget tab, the
 saved balance, days correction and history are unchanged. **Use my real
 numbers** restores the real balance and days after sandbox changes.
+
+## SP-07: Reserve goal, spending rate and projection
+
+**Requirements:** FR-37, FR-39, FR-42, FR-43
+
+The reserve goal is the number of points to keep at the end of the quarter. It
+defaults to 0 and is kept to the nearest hundredth.
+
+- A reserve that is negative, not a number, or more than the current balance is
+  rejected (`std::invalid_argument`), and the previous reserve is kept.
+- Spendable points = balance - reserve, never below 0. If the balance later falls
+  below the reserve, spendable points and all advice are 0 until the reserve is lowered.
+- Daily and weekly advice (SP-04) divide the spendable points instead of the balance.
+- **Recent spending rate** = net points spent over the last 7 days, counting today,
+  divided by 7. Net spending is purchases plus balance corrections that lowered the
+  balance, minus refunds dated in the same 7 days. A rate below 0 counts as 0. It is
+  worked out from the history, so it covers spending the user didn't log as a purchase.
+- **Projected end balance** = balance - rate x days remaining, to the nearest
+  hundredth. It can be negative, which means the points run out before the quarter ends.
+- The reserve warning shows when the projected end balance is less than the reserve.
+- The run-out condition (for the alert in FR-42) is a projected end balance below 0.
+
+**Test cases:** with 700 points, 70 days and a 140-point reserve, per day is 8 and
+next 7 days is 56. A reserve of -1 or 701 is rejected and the previous reserve
+stays. Spending 600 of the 700 leaves 0 spendable points. With 700 points, 70 days,
+a 140-point reserve and a rate of 9 per day, the projection is 70 and the warning
+shows; at 8 per day the projection is 140 and it does not. At 11 per day the
+projection is -70, so the points run out.
+
+## SP-08: Dining habits and per-meal suggestions
+
+**Requirements:** FR-38, FR-39, FR-40
+
+Dining habits are the number of meals eaten on campus on each weekday, Monday
+through Sunday, each from 0 to 10. A day with 0 meals is not a campus day. A meal
+count outside 0 to 10 is rejected and the previous habits are kept.
+
+- The remaining campus days and meals count the days remaining (SP-05) starting
+  today, using each day's weekday.
+- Points per meal = spendable points / remaining campus meals, and points per campus
+  day = spendable points / remaining campus days, each rounded down to the nearest
+  hundredth.
+- With no habits entered, or no campus days left, both suggestions are 0 and the
+  Plan tab shows only the daily and weekly advice.
+- Suggestions update when the balance, days remaining, reserve or habits change.
+
+**Test cases:** with 2 meals on Monday through Friday, 14 days starting on a Monday
+have 10 campus days and 20 meals; with 400 spendable points that is 20 per meal and
+40 per campus day. 3 days starting on a Saturday have 1 campus day. Habits of all 0,
+or a meal count of 11, give no suggestions or are rejected.

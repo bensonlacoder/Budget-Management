@@ -40,25 +40,31 @@ public:
     // Returns the spendable points when fewer than 7 days remain, including 0.
     double getWeeklyBudget() const;
 
-    // Average net points spent per day over the recent spending window (SP-07).
+    // Average net points spent per day over the last 7 days (SP-07). Defaults to 0.
     // Throws std::invalid_argument if pointsPerDay is negative or not finite.
     void setRecentSpendingRate(double pointsPerDay);
 
     double getRecentSpendingRate() const;
 
-    // Balance projected to the end of the quarter at the recent spending rate.
+    // Balance minus the recent spending rate times the remaining days, to the nearest
+    // hundredth. Negative when the points would run out before the quarter ends.
     double getProjectedEndBalance() const;
 
-    // True when the projection leaves fewer points than the reserve goal.
+    // True when the projection leaves fewer points than the reserve goal (FR-43).
     bool isProjectedBelowReserve() const;
 
+    // True when the projection runs out of points before the quarter ends (FR-42).
+    bool isProjectedToRunOut() const;
+
     // Throws std::invalid_argument if a meal count is outside 0 through 10.
+    // A rejected update leaves the previous habits in place.
     void setDiningHabits(const DiningHabits &habits);
 
     const DiningHabits &getDiningHabits() const;
 
-    // The numbers below count `getRemainingDays()` days starting at firstWeekday,
-    // using QDate::dayOfWeek (1 = Monday ... 7 = Sunday). An invalid weekday gives 0.
+    // The numbers below count `getRemainingDays()` days starting today, where
+    // firstWeekday is today's QDate::dayOfWeek (1 = Monday ... 7 = Sunday).
+    // An invalid weekday gives 0. See SP-08.
     int getRemainingCampusDays(int firstWeekday) const;
     int getRemainingCampusMeals(int firstWeekday) const;
     // Spendable points per on-campus meal or campus day, rounded down.
