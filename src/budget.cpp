@@ -36,3 +36,17 @@ void Budget::setRemainingDays(int days) {
 int Budget::getRemainingDays() const {
     return remainingDays;
 }
+
+double Budget::getDailyBudget() const {
+    if (remainingDays == 0) {
+        return balance.getBalance();
+    }
+    return floorToHundredths(balance.getBalance() / remainingDays);
+}
+
+double Budget::getWeeklyBudget() const {
+    if (remainingDays < DAYS_PER_WEEK) {
+        return balance.getBalance();
+    }
+    return floorToHundredths(balance.getBalance() * DAYS_PER_WEEK / remainingDays);
+}
