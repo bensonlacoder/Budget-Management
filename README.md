@@ -8,7 +8,8 @@ Current features include: local accounts with a dining plan, logging purchases f
 SCU menus or a receipt, purchase history, friends who can see each other's balance,
 and daily/weekly spending recommendations on the Plan tab, with a reserve goal,
 per-meal suggestions from your dining habits (typed in or uploaded as a CSV), and a
-warning when recent spending would leave less than the reserve. Accounts, balances and purchases are saved
+warning when recent spending would leave less than the reserve. Optional alerts warn
+when you go over today's budget or are on track to run out before the quarter ends. Accounts, balances and purchases are saved
 on this computer between sessions.
 
 See [REQUIREMENTS.md](REQUIREMENTS.md) for its scope and acceptance criteria, and
@@ -220,7 +221,7 @@ again to confirm a passing run. Keep the submitted application branch passing.
   left, reserve goal and dining habits, and project the end-of-quarter balance.
 - `src/habitscsv.h` and `src/habitscsv.cpp`: read dining habits from an uploaded CSV file.
 - `UI/planpage.*`: the Plan tab; shows the real advice and saves the reserve goal and
-  dining habits.
+  dining habits, and raises the spending alerts that are turned on.
 - `UI/mainui.h` and `UI/mainui.cpp`: connect user actions to the models and update the display.
 - `UI/mainui.ui`: define the layout; edit it in Qt Designer.
 - `UI/main.cpp`: show sign-in, then build the main window, tabs and Account menu.
@@ -233,7 +234,8 @@ again to confirm a passing run. Keep the submitted application branch passing.
   these functions and never open the database themselves.
 - `UI/purchasespage.*`: log and remove purchases and show opening hours.
 - `UI/scumenu.*` and `UI/lunchcatalog.cpp`: SCU locations, menu prices and hours parsing.
-- `UI/friendsdialog.*`: send, accept and view friend requests.
+- `UI/friendsdialog.*`: send, accept and view friend requests, see sent requests still
+  waiting for an answer, and remove a friend.
 - `tests/`: exercise the model classes with doctest; `test_main.cpp` supplies the test entry point.
 - `tests/ui/`: exercise the widgets, account store and menu parsing.
 - `.github/workflows/ci.yml`: build and test the project in GitHub Actions.

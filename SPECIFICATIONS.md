@@ -214,7 +214,7 @@ have 10 campus days and 20 meals; with 400 spendable points that is 20 per meal 
 40 per campus day. 3 days starting on a Saturday have 1 campus day. Habits of all 0,
 or a meal count of 11, give no suggestions or are rejected.
 
-## SP-09: Purchase history and refunds
+## SP-10: Purchase history and refunds
 
 - History shows purchases, refunds, and balance corrections. Date filters are inclusive.
   A linked refund follows the current location of its original purchase. Standalone
@@ -226,7 +226,7 @@ or a meal count of 11, give no suggestions or are rejected.
   the unrefunded part of the purchase. Removing a refund on its own deducts the points it
   returned. Any edit or removal that would make the balance negative is rejected.
 
-## SP-10: Spending and budget comparison
+## SP-11: Spending and budget comparison
 
 - Location totals and the daily and weekly charts use transactions dated within the
   selected range. Purchases add to spending, refunds reduce spending on the refund date,
@@ -238,3 +238,27 @@ or a meal count of 11, give no suggestions or are rejected.
   Weeks run Monday through Sunday. For a partial week at either end of the selected
   range, the weekly budget is multiplied by the fraction of days included and rounded
   down to the nearest hundredth.
+## SP-09: Spending alerts
+
+**Requirements:** FR-41, FR-42
+
+The Plan tab has two alert choices, each off until turned on, saved separately:
+
+- **Over today's budget:** applies when today's net spending (SP-07's rules,
+  counting only today) is more than today's budget. Today's budget is the daily
+  advice (SP-04) worked out from the balance before today's spending, so spending
+  today doesn't lower its own limit: (balance + spent today - reserve) / days
+  remaining, rounded down to the hundredth.
+- **Run out before the quarter ends:** applies when the projected end balance
+  (SP-07) is below 0.
+
+Neither applies once the quarter has ended (0 days remaining). An alert that is
+off never appears. While an alert that is on applies, the Plan tab shows it in a
+red banner at the top, and the app pops it up once a day, at most, the first time
+it applies after sign-in or after the balance, days, reserve, or alert choice
+changes. The banner disappears when the alert stops applying.
+
+**Test cases:** with 695 points left after spending 25 today, no reserve and 72
+days, today's budget is (695 + 25) / 72 = 10 and the over-budget alert applies;
+with 710 left after spending exactly 10, it does not. With 700 points, 70 days and 11 points a day of recent spending, the run-out
+alert applies; at 10 a day it does not. With either alert off, nothing appears.

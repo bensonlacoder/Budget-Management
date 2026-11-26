@@ -11,6 +11,7 @@
 #include <QApplication>
 #include <QMenu>
 #include <QMenuBar>
+#include <QMessageBox>
 
 #include <optional>
 
@@ -40,6 +41,14 @@ int main(int argc, char *argv[]) {
         auto *plan = new PlanPage(accountName, window);
         auto *charts = new ChartsPage(accountName, window);
         auto *profilePage = new ProfilePage(accountName, window);
+        // Spending alerts from the Plan tab pop up without blocking the window.
+        QObject::connect(plan, &PlanPage::alertRaised, window, [window](const QString &message) {
+            auto *box = new QMessageBox(QMessageBox::Warning, QObject::tr("Spending alert"),
+                                        message, QMessageBox::Ok, window);
+            box->setAttribute(Qt::WA_DeleteOnClose);
+            box->setModal(false);
+            box->show();
+        });
         window->addPage(plan, QObject::tr("P&lan"));
         window->addPage(charts, QObject::tr("&Charts"));
         window->addPage(profilePage, QObject::tr("P&rofile"));

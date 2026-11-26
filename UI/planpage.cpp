@@ -3,6 +3,7 @@
 #include "habitscsv.h"
 #include "quarter.h"
 
+#include <QCheckBox>
 #include <QDoubleSpinBox>
 #include <QFile>
 #include <QFileDialog>
@@ -50,6 +51,12 @@ PlanPage::PlanPage(const QString &accountName, QWidget *parent)
       shownDate(QDate::currentDate()) {
     auto *content = new QWidget;
     auto *layout = new QVBoxLayout(content);
+
+    alertsBanner = namedLabel("alertsBanner", content, true);
+    alertsBanner->setStyleSheet(QStringLiteral(
+        "color: #b00020; background: #fdecea; border: 1px solid #f5c2c0; padding: 8px;"));
+    alertsBanner->hide();
+    layout->addWidget(alertsBanner);
 
     // ---- Advice ----
     auto *adviceBox = new QGroupBox(tr("Your spending plan"), content);
@@ -129,6 +136,22 @@ PlanPage::PlanPage(const QString &accountName, QWidget *parent)
     habitsForm->addRow(QString(), habitsMessage);
     layout->addWidget(habitsBox);
 
+    // ---- Alerts ----
+    auto *alertsBox = new QGroupBox(tr("Alerts"), content);
+    auto *alertsLayout = new QVBoxLayout(alertsBox);
+    overDailyAlert = new QCheckBox(tr("Alert me when I spend more than to&day's budget"),
+                                   alertsBox);
+    overDailyAlert->setObjectName("overDailyAlertCheckBox");
+    runOutAlert = new QCheckBox(
+        tr("Alert me when I'm on track to run &out of points before the quarter ends"),
+        alertsBox);
+    runOutAlert->setObjectName("runOutAlertCheckBox");
+    alertsMessage = namedLabel("alertsMessage", alertsBox);
+    alertsLayout->addWidget(overDailyAlert);
+    alertsLayout->addWidget(runOutAlert);
+    alertsLayout->addWidget(alertsMessage);
+    layout->addWidget(alertsBox);
+
     // ---- Projection ----
     auto *projectionBox = new QGroupBox(tr("End of quarter"), content);
     auto *projectionLayout = new QVBoxLayout(projectionBox);
@@ -150,8 +173,15 @@ PlanPage::PlanPage(const QString &accountName, QWidget *parent)
 
     connect(saveButton, &QPushButton::clicked, this, &PlanPage::saveReserve);
     connect(uploadButton, &QPushButton::clicked, this, &PlanPage::chooseHabitsFile);
+    connect(overDailyAlert, &QCheckBox::toggled, this, &PlanPage::saveAlerts);
+    connect(runOutAlert, &QCheckBox::toggled, this, &PlanPage::saveAlerts);
 
     refresh();
+    // Raise any alert that already applies once the caller has had a chance to connect.
+    QTimer::singleShot(0, this, [this] {
+        raiseAlerts = true;
+        checkAlerts();
+    });
 
     // Days left and the 7-day spending window move on at midnight.
     auto *clock = new QTimer(this);
@@ -163,11 +193,11 @@ PlanPage::PlanPage(const QString &accountName, QWidget *parent)
     clock->start(DATE_CHECK_INTERVAL_MS);
 }
 
-double PlanPage::recentSpendingRate(const QList<HistoryEntry> &history, const QDate &today) {
-    const QDate first = today.addDays(1 - SpendingWindowDays);
+double PlanPage::netSpending(const QList<HistoryEntry> &history, const QDate &first,
+                             const QDate &last) {
     double spent = 0.0;
     for (const HistoryEntry &entry : history) {
-        if (entry.date < first || entry.date > today) {
+        if (entry.date < first || entry.date > last) {
             continue;
         }
         // Corrections that raised the balance aren't income from spending less.
@@ -176,6 +206,11 @@ double PlanPage::recentSpendingRate(const QList<HistoryEntry> &history, const QD
         }
         spent -= entry.balanceChange;
     }
+    return spent;
+}
+
+double PlanPage::recentSpendingRate(const QList<HistoryEntry> &history, const QDate &today) {
+    const double spent = netSpending(history, today.addDays(1 - SpendingWindowDays), today);
     return std::max(0.0, spent / SpendingWindowDays);
 }
 
@@ -203,13 +238,66 @@ void PlanPage::refresh() {
         reserveEdit->setValue(settings.reserveGoal);
         budget.setDiningHabits(settings.habits);
         showHabits(settings.habits);
+        const QSignalBlocker quietOverDaily(overDailyAlert);
+        const QSignalBlocker quietRunOut(runOutAlert);
+        overDailyAlert->setChecked(settings.alertOverDailyBudget);
+        runOutAlert->setChecked(settings.alertRunOutBeforeQuarterEnd);
         loaded = true;
     }
     balance.setBalance(profile.balance);
     budget.setRemainingDays(days);
     budget.setRecentSpendingRate(recentSpendingRate(history, shownDate));
+    spentToday = netSpending(history, shownDate, shownDate);
     loadMessage->clear();
     showAdvice();
+}
+
+void PlanPage::saveAlerts() {
+    const bool overDaily = overDailyAlert->isChecked();
+    const bool runOut = runOutAlert->isChecked();
+    if (!loaded || !saveSettings([overDaily, runOut](LocalAccounts::PlanSettings &settings) {
+            settings.alertOverDailyBudget = overDaily;
+            settings.alertRunOutBeforeQuarterEnd = runOut;
+        })) {
+        // Show the saved choices again.
+        LocalAccounts::PlanSettings saved;
+        LocalAccounts::loadPlanSettings(accountName, saved);
+        const QSignalBlocker quietOverDaily(overDailyAlert);
+        const QSignalBlocker quietRunOut(runOutAlert);
+        overDailyAlert->setChecked(saved.alertOverDailyBudget);
+        runOutAlert->setChecked(saved.alertRunOutBeforeQuarterEnd);
+        showMessage(alertsMessage, tr("Could not save your alert choices. Try again."), true);
+        return;
+    }
+    showMessage(alertsMessage, tr("Alert choices saved."), false);
+    checkAlerts();
+}
+
+void PlanPage::checkAlerts() {
+    QStringList active;
+    const auto raise = [this, &active](const QString &message, QDate &raisedOn) {
+        active << message;
+        if (raiseAlerts && raisedOn != shownDate) {
+            raisedOn = shownDate;
+            emit alertRaised(message);
+        }
+    };
+    if (loaded && overDailyAlert->isChecked() && budget.getRemainingDays() > 0
+        && budget.isOverTodaysBudget(spentToday)) {
+        raise(tr("You've spent %1 today, more than today's budget of %2.")
+                  .arg(formatPoints(spentToday),
+                       formatPoints(budget.getTodaysBudget(spentToday))),
+              overDailyRaisedOn);
+    }
+    if (loaded && runOutAlert->isChecked() && budget.getRemainingDays() > 0
+        && budget.isProjectedToRunOut()) {
+        raise(tr("At your recent spending of %1 a day, you'll run out of points before the "
+                 "quarter ends.")
+                  .arg(formatPoints(budget.getRecentSpendingRate())),
+              runOutRaisedOn);
+    }
+    alertsBanner->setText(active.join(QLatin1Char('\n')));
+    alertsBanner->setVisible(!active.isEmpty());
 }
 
 void PlanPage::saveReserve() {
@@ -388,6 +476,7 @@ void PlanPage::showAdvice() {
                    .arg(formatPoints(budget.getReserveGoal()),
                         formatPoints(budget.getDailyBudget()))
              : QString());
+    checkAlerts();
 }
 
 void PlanPage::showMessage(QLabel *label, const QString &text, bool error) {

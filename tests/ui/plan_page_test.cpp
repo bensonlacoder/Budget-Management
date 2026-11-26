@@ -1,15 +1,18 @@
-// Tests for the Plan tab (T06): real advice, the reserve goal and the end-of-quarter
-// projection. Each test uses a temporary database.
+// Tests for the Plan tab (T06, T07, T13): real advice, the reserve goal, the end-of-quarter
+// projection, dining habits and spending alerts. Each test uses a temporary database.
 
 #include "doctest.h"
 #include "habitscsv.h"
 #include "planpage.h"
 #include "test_account_store.h"
 
+#include <QCheckBox>
+#include <QCoreApplication>
 #include <QDoubleSpinBox>
 #include <QFile>
 #include <QLabel>
 #include <QPushButton>
+#include <QSignalSpy>
 #include <QSpinBox>
 #include <QTemporaryDir>
 
@@ -358,4 +361,135 @@ TEST_CASE("A bad habits file shows a clear error and changes nothing") {
           == "Couldn't upload huge.csv. The file is too large for a list of days. Your "
              "habits haven't changed.");
     CHECK(savedHabits(account) == LocalAccounts::DiningHabits{2, 0, 0, 0, 0, 0, 0});
+}
+
+// ---- Spending alerts (T13) ----
+
+namespace {
+void turnOnAlerts(const QString &account, bool overDaily, bool runOut) {
+    LocalAccounts::PlanSettings settings;
+    REQUIRE(LocalAccounts::loadPlanSettings(account, settings));
+    settings.alertOverDailyBudget = overDaily;
+    settings.alertRunOutBeforeQuarterEnd = runOut;
+    REQUIRE(LocalAccounts::savePlanSettings(account, settings) == Result::Success);
+}
+
+// Lets the page raise the alerts that apply when it opens.
+void openPage() {
+    QCoreApplication::processEvents();
+}
+
+const char *const OVER_TODAY =
+    "You've spent 25.00 points today, more than today's budget of 10.00 points.";
+}
+
+// Author: Nathan Gu
+TEST_CASE("Alert choices are off by default, saved separately and kept after reopening") {
+    TestAccountStore store;
+    const QString account = accountWith(store, 700.0, 70);
+    {
+        PlanPage page(account);
+        PlanUi ui{page};
+        CHECK_FALSE(ui.find<QCheckBox>("overDailyAlertCheckBox")->isChecked());
+        CHECK_FALSE(ui.find<QCheckBox>("runOutAlertCheckBox")->isChecked());
+        ui.find<QCheckBox>("runOutAlertCheckBox")->setChecked(true);
+        CHECK(ui.text("alertsMessage") == "Alert choices saved.");
+        ui.saveReserve(100.0); // Saving the reserve keeps the alert choices.
+    }
+    LocalAccounts::PlanSettings saved;
+    REQUIRE(LocalAccounts::loadPlanSettings(account, saved));
+    CHECK_FALSE(saved.alertOverDailyBudget);
+    CHECK(saved.alertRunOutBeforeQuarterEnd);
+
+    PlanPage reopened(account);
+    PlanUi ui{reopened};
+    CHECK_FALSE(ui.find<QCheckBox>("overDailyAlertCheckBox")->isChecked());
+    CHECK(ui.find<QCheckBox>("runOutAlertCheckBox")->isChecked());
+}
+
+// Author: Nathan Gu
+TEST_CASE("Going over today's budget raises one alert that day when it is on") {
+    TestAccountStore store;
+    // 720 points and 72 days: today's budget is 10. Spending 25 goes over it.
+    const QString account = accountWith(store, 720.0, 72);
+    spendToday(account, 25.0);
+    PlanPage page(account);
+    PlanUi ui{page};
+    QSignalSpy alerts(&page, &PlanPage::alertRaised);
+    openPage();
+    auto *banner = ui.find<QLabel>("alertsBanner");
+    CHECK(alerts.isEmpty()); // Off: never appears.
+    CHECK(banner->isHidden());
+
+    ui.find<QCheckBox>("overDailyAlertCheckBox")->setChecked(true);
+    REQUIRE(alerts.size() == 1);
+    CHECK(alerts.at(0).at(0).toString() == OVER_TODAY);
+    CHECK_FALSE(banner->isHidden());
+    CHECK(banner->text() == OVER_TODAY);
+
+    // Still over after more spending, but the popup comes only once a day.
+    spendToday(account, 5.0);
+    page.refresh();
+    CHECK(alerts.size() == 1);
+    CHECK_FALSE(banner->isHidden());
+
+    // Turning the alert off hides it.
+    ui.find<QCheckBox>("overDailyAlertCheckBox")->setChecked(false);
+    CHECK(banner->isHidden());
+    CHECK(alerts.size() == 1);
+}
+
+// Author: Nathan Gu
+TEST_CASE("An alert that is already on is raised when the Plan tab opens") {
+    TestAccountStore store;
+    const QString account = accountWith(store, 720.0, 72);
+    spendToday(account, 25.0);
+    turnOnAlerts(account, true, false);
+    PlanPage page(account);
+    QSignalSpy alerts(&page, &PlanPage::alertRaised);
+    CHECK(alerts.isEmpty()); // Not until the caller has had a chance to connect.
+    openPage();
+    REQUIRE(alerts.size() == 1);
+    CHECK(alerts.at(0).at(0).toString() == OVER_TODAY);
+}
+
+// Author: Nathan Gu
+TEST_CASE("Spending exactly today's budget raises no alert") {
+    TestAccountStore store;
+    const QString account = accountWith(store, 720.0, 72);
+    spendToday(account, 10.0);
+    turnOnAlerts(account, true, true);
+    PlanPage page(account);
+    PlanUi ui{page};
+    QSignalSpy alerts(&page, &PlanPage::alertRaised);
+    openPage();
+    CHECK(alerts.isEmpty());
+    CHECK(ui.find<QLabel>("alertsBanner")->isHidden());
+}
+
+// Author: Nathan Gu
+TEST_CASE("Running out before the quarter ends raises an alert only when it is on") {
+    TestAccountStore store;
+    // 11 points a day over the last week with 700 left and 70 days runs out early.
+    // Today's spending (77) is also over today's budget, but that alert stays off.
+    const QString account = accountWith(store, 777.0, 70);
+    spendToday(account, 77.0);
+    turnOnAlerts(account, false, true);
+    PlanPage page(account);
+    PlanUi ui{page};
+    QSignalSpy alerts(&page, &PlanPage::alertRaised);
+    openPage();
+    const QString runOut = "At your recent spending of 11.00 points a day, you'll run out of "
+                           "points before the quarter ends.";
+    REQUIRE(alerts.size() == 1);
+    CHECK(alerts.at(0).at(0).toString() == runOut);
+    CHECK(ui.text("alertsBanner") == runOut);
+
+    // Topping up so the points last stops the alert from applying.
+    double balance = 0.0;
+    REQUIRE(LocalAccounts::correctBalance(account, CorrectionMode::Add, 100.0, balance)
+            == Result::Success);
+    page.refresh();
+    CHECK(ui.find<QLabel>("alertsBanner")->isHidden());
+    CHECK(alerts.size() == 1);
 }

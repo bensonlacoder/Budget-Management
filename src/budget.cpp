@@ -90,6 +90,23 @@ double Budget::getRecentSpendingRate() const {
     return recentSpendingRate;
 }
 
+double Budget::getTodaysBudget(double spentToday) const {
+    if (!std::isfinite(spentToday)) {
+        throw std::invalid_argument("Points spent today must be a number");
+    }
+    // Refunds can make today's net spending negative; that doesn't raise the budget.
+    const double startOfDay = balance.getBalance() + std::max(0.0, spentToday);
+    const double spendable = std::max(0.0, roundToHundredths(startOfDay - reserveGoal));
+    if (remainingDays == 0) {
+        return spendable;
+    }
+    return floorToHundredths(spendable / remainingDays);
+}
+
+bool Budget::isOverTodaysBudget(double spentToday) const {
+    return hundredths(spentToday) > hundredths(getTodaysBudget(spentToday));
+}
+
 double Budget::getProjectedEndBalance() const {
     return roundToHundredths(balance.getBalance() - recentSpendingRate * remainingDays);
 }

@@ -56,6 +56,15 @@ public:
     // True when the projection runs out of points before the quarter ends (FR-42).
     bool isProjectedToRunOut() const;
 
+    // Today's daily budget, given the net points already spent today (SP-09): the
+    // daily advice worked out from the balance as it was before today's spending, so
+    // spending today doesn't lower today's own budget. Throws std::invalid_argument if
+    // spentToday is not finite.
+    double getTodaysBudget(double spentToday) const;
+
+    // True when spentToday is more than getTodaysBudget(spentToday) (FR-42).
+    bool isOverTodaysBudget(double spentToday) const;
+
     // Throws std::invalid_argument if a meal count is outside 0 through 10.
     // A rejected update leaves the previous habits in place.
     void setDiningHabits(const DiningHabits &habits);

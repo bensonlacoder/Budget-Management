@@ -9,6 +9,8 @@ class QLineEdit;
 class QListWidget;
 class QTableWidget;
 
+// Friend ID, sending and answering requests, pending sent requests, and accepted
+// friends' balances, with removing a friend (T05).
 class FriendsDialog : public QDialog {
     Q_OBJECT
 
@@ -19,13 +21,16 @@ private:
     void refresh();
     void sendRequest();
     void respond(bool accept);
+    void removeFriend();
 
     QString accountName;
     QLineEdit *requestId;
     QLabel *status;
     QListWidget *requests;
+    QListWidget *sent;
     QTableWidget *friends;
     QLabel *noRequests;
+    QLabel *noSent;
     QLabel *noFriends;
 };
 
