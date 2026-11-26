@@ -19,12 +19,12 @@
 
 | ID | Requirement |
 | --- | --- |
-| FR-17 | Create an account with an email address and password, and sign in with them to access its saved data. |
+| ✅ FR-17 | Create an account with an email address and password, and sign in with them to access its saved data. |
 | ✅ FR-18 | Sign out and return to the sign-in screen. |
 | FR-19 | See the email address that identifies the signed-in account. |
 | FR-20 | View and update profile information, including display name and email address. |
 | FR-21 | Change the account password while signed in, or reset a forgotten password with a code sent to the account's email address. |
-| FR-46 | Verify the account's email address with a code sent at sign-up before the account can be used, and request a new code if it expires or does not arrive. |
+| ✅ FR-46 | Verify the account's email address with a code sent at sign-up before the account can be used, and request a new code if it expires or does not arrive. |
 | ✅ FR-48 | Turn two-step sign-in on or off. While it is on, signing in also requires a code sent to the account's email address, which can be resent and works only once. |
 | FR-22 | See the current quarter's dates from the SCU academic calendar (first day of classes through the last day of finals) and have the days remaining calculated from them automatically. Between quarters, see the next quarter's full length and the date it starts. |
 | FR-23 | Reopen the app and find the signed-in account's saved balance, history, budget settings, alert preferences, friends, and saved menus. |
@@ -75,5 +75,5 @@
 
 | ID | Requirement |
 | --- | --- |
-| FR-44 | Find available meal options at or below a chosen point limit and see their dining locations and point prices. |
-| FR-45 | Save specific menu sections for quick access later and remove them from the saved list when desired. |
+| ✅ FR-44 | Find available meal options at or below a chosen point limit and see their dining locations and point prices. |
+| ✅ FR-45 | Save specific menu sections for quick access later and remove them from the saved list when desired. |

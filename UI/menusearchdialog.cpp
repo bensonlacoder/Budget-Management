@@ -10,6 +10,7 @@
 #include <QLabel>
 #include <QListWidget>
 #include <QLocale>
+#include <QMessageBox>
 #include <QPushButton>
 #include <QTableWidget>
 #include <QVBoxLayout>
@@ -254,6 +255,18 @@ void MenuSearchDialog::removeSection() {
         return;
     }
     const QString section = selected.first()->text();
+    QMessageBox confirm(QMessageBox::Question, tr("Remove saved section?"),
+                        tr("Remove %1 from your saved sections? You can save it again later.")
+                            .arg(section),
+                        QMessageBox::Cancel, this);
+    confirm.setObjectName("confirmRemoveSection");
+    QPushButton *removeChoice = confirm.addButton(tr("&Remove"), QMessageBox::DestructiveRole);
+    confirm.setDefaultButton(QMessageBox::Cancel); // Enter alone doesn't remove anything.
+    confirm.exec();
+    if (confirm.clickedButton() != removeChoice) {
+        feedback->setText(tr("%1 is still saved.").arg(section));
+        return;
+    }
     const auto result = LocalAccounts::removeSection(account, section);
     refreshSaved();
     feedback->setText(result == LocalAccounts::Result::Success
