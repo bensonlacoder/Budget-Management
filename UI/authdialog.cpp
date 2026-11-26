@@ -444,7 +444,7 @@ void AuthDialog::showError(Result result) {
         message->setText(tr("That code has expired. Send a new code and try again."));
         break;
     case Result::CodeNotSent:
-        message->setText(tr("Couldn't send the code. Try again."));
+        message->setText(tr("Couldn't send the code. Wait a minute, then try again."));
         break;
     default:
         message->setText(tr("Could not open the account database. Try again."));

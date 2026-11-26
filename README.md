@@ -127,38 +127,39 @@ With fewer than 7 days left, the weekly recommendation equals the remaining bala
 
 ## Email codes
 
-The app sends sign-up, password reset and two-step sign-in codes through a Google Apps Script web app,
-[apps-script/send-code.gs](apps-script/send-code.gs), running on a Gmail account
-used only for this app. Without it, creating an account shows "Couldn't send the
-code. Try again." Tests never send email; they use a fake sender.
+The app sends sign-up, password reset and two-step sign-in codes through a Google Apps
+Script web app, [apps-script/send-code.gs](apps-script/send-code.gs), running on a
+Gmail account used only for this app. **Its URL is built into the app**
+(`EmailSender::DefaultUrl` in [UI/emailsender.h](UI/emailsender.h)), so email codes
+work on any computer with internet access and no setup, including a grader's. Tests
+never send email; they use a fake sender.
 
-**Set it up once (the team's sender account):**
+The app holds no secret. The Gmail access stays on Google's servers, and anyone could
+find the URL, so the script protects itself instead:
 
-1. Create a new Gmail account for the app. Don't use an SCU or personal account.
+- It only ever sends one fixed message containing a 6-digit code.
+- It sends one email per address per minute and at most 5 per address per hour.
+- It sends at most 90 emails a day in total, below Gmail's limit of about 100.
+
+If sending fails (no internet, or a limit was reached), the app shows "Couldn't send
+the code. Wait a minute, then try again."
+
+**Set up a new sender (only if replacing the team's):**
+
+1. Create a new Gmail account for the app. Don't use an SCU or personal account; SCU
+   accounts can't share web apps with *Anyone*.
 2. Signed in as that account, open [script.google.com](https://script.google.com),
    choose **New project**, and replace the contents of `Code.gs` with
    `apps-script/send-code.gs`. Save.
-3. Choose a long random secret, for example the output of
-   `python -c "import secrets; print(secrets.token_urlsafe(32))"`. In **Project
-   Settings > Script properties**, add a property named `SHARED_SECRET` with that
-   value. The secret is never written in the script or the repository.
-4. Choose **Deploy > New deployment**, select type **Web app**, set **Execute as** to
+3. Choose **Deploy > New deployment**, select type **Web app**, set **Execute as** to
    *Me* and **Who has access** to *Anyone*, then **Deploy**. Google asks you to
    authorize sending email as that account; allow it. Copy the **Web app URL**
    (it ends in `/exec`). *Anyone* is needed because the desktop app doesn't sign in to
-   Google; the shared secret is what stops others from using it.
+   Google.
+4. Put the URL in `EmailSender::DefaultUrl`, or, to try it without changing the code,
+   in an `email-sender.ini` file (see [email-sender.example.ini](email-sender.example.ini)).
 5. After editing the script later, use **Deploy > Manage deployments > Edit > New
    version** so the URL stays the same.
-
-**On each computer that runs the app:** copy
-[email-sender.example.ini](email-sender.example.ini) to `email-sender.ini` in the
-app's data folder (on Windows, `%LOCALAPPDATA%\DiningPointsBudget\email-sender.ini`),
-or point the `DINING_POINTS_EMAIL_CONFIG` environment variable at it, and fill in the
-URL and secret. `email-sender.ini` is in `.gitignore`: never commit it, and share the
-secret with teammates privately.
-
-The script sends at most 5 emails per address per hour, and Apps Script lets a Gmail
-account send about 100 emails a day.
 
 ## Scope and limitations
 

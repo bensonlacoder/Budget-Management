@@ -142,7 +142,7 @@ TEST_CASE("A sign-up whose code can't be sent is undone") {
     AuthDialog dialog;
     AuthForm form(dialog);
     form.createAccount("offline@scu.edu");
-    CHECK(form.message->text() == "Couldn't send the code. Try again.");
+    CHECK(form.message->text() == "Couldn't send the code. Wait a minute, then try again.");
     CHECK(form.submit->text() == "&Create account");
     LocalAccounts::Profile profile;
     CHECK(LocalAccounts::signIn("offline@scu.edu", "long-password", profile)
@@ -273,7 +273,7 @@ TEST_CASE("A sign-in code that can't be sent keeps the user on the sign-in scree
     form.email->setText("offline2@scu.edu");
     form.password->setText("long-password");
     form.submit->click();
-    CHECK(form.message->text() == "Couldn't send the code. Try again.");
+    CHECK(form.message->text() == "Couldn't send the code. Wait a minute, then try again.");
     CHECK(form.submit->text() == "&Sign in");
     CHECK(form.password->isVisibleTo(&dialog));
     CHECK_FALSE(form.accepted());

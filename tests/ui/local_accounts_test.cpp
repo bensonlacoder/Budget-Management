@@ -7,6 +7,8 @@
 #include "test_account_store.h"
 
 #include <QDir>
+#include <QFile>
+#include <QFileInfo>
 #include <QRegularExpression>
 #include <QSqlDatabase>
 #include <QSqlQuery>
@@ -916,18 +918,49 @@ TEST_CASE("Accounts made before email verification existed can still sign in") {
     CHECK(LocalAccounts::signIn("early@scu.edu", "correct-horse", profile) == Result::Success);
 }
 
-TEST_CASE("The real email sender refuses to send without its settings file") {
-    TestAccountStore store;
-    const QByteArray missing =
+// Writes a settings file for the real email sender and points it there.
+static QString writeSenderSettings(const QByteArray &contents) {
+    const QString path =
         QDir(QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation))
-            .filePath("no-such-email-sender.ini")
-            .toUtf8();
-    qputenv("DINING_POINTS_EMAIL_CONFIG", missing);
-    EmailSender::setSender({}); // The real sender; it must fail before any network use.
-    CHECK(EmailSender::configPath() == QString::fromUtf8(missing));
-    CHECK_FALSE(EmailSender::send("someone@scu.edu", "123456", EmailSender::Purpose::Verification));
+            .filePath("email-sender.ini");
+    QDir().mkpath(QFileInfo(path).absolutePath());
+    QFile file(path);
+    REQUIRE(file.open(QIODevice::WriteOnly));
+    file.write(contents);
+    file.close();
+    qputenv("DINING_POINTS_EMAIL_CONFIG", path.toUtf8());
+    return path;
+}
+
+TEST_CASE("The real email sender works without setup and can be pointed elsewhere") {
+    TestAccountStore store;
+    const QString path =
+        QDir(QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation))
+            .filePath("no-such-email-sender.ini");
+    qputenv("DINING_POINTS_EMAIL_CONFIG", path.toUtf8());
+    CHECK(EmailSender::configPath() == path);
+    // No settings file: the built-in web app, so it works on any computer.
+    CHECK(EmailSender::url() == QUrl(QString::fromLatin1(EmailSender::DefaultUrl)));
+    CHECK(EmailSender::url().scheme() == "https");
+    CHECK(EmailSender::url().host() == "script.google.com");
+
+    writeSenderSettings("[sender]\nurl=https://script.google.com/macros/s/other/exec\n");
+    CHECK(EmailSender::url() == QUrl("https://script.google.com/macros/s/other/exec"));
+    qunsetenv("DINING_POINTS_EMAIL_CONFIG");
+}
+
+TEST_CASE("The real email sender refuses to send when turned off or not https") {
+    TestAccountStore store;
     createUnverified("real@scu.edu");
-    CHECK(LocalAccounts::sendVerificationCode("real@scu.edu") == Result::CodeNotSent);
+    for (const QByteArray contents : {QByteArray("[sender]\nurl=\n"),
+                                      QByteArray("[sender]\nurl=http://example.com/exec\n")}) {
+        CAPTURE(contents);
+        writeSenderSettings(contents);
+        EmailSender::setSender({}); // The real sender; it must fail before any network use.
+        CHECK_FALSE(EmailSender::send("someone@scu.edu", "123456",
+                                      EmailSender::Purpose::Verification));
+        CHECK(LocalAccounts::sendVerificationCode("real@scu.edu") == Result::CodeNotSent);
+    }
     qunsetenv("DINING_POINTS_EMAIL_CONFIG");
 }
 
