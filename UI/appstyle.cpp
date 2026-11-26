@@ -51,9 +51,14 @@ QString shortDate(const QDate &date) {
     return locale().toString(date, QStringLiteral("MMM d"));
 }
 
+QString time(const QTime &time) {
+    // An explicit format: the locale's short format puts a narrow no-break space
+    // before AM/PM in newer Qt versions.
+    return locale().toString(time, QStringLiteral("h:mm AP"));
+}
+
 QString dateTime(const QDateTime &dateTime) {
-    return QWidget::tr("%1, %2")
-        .arg(date(dateTime.date()), locale().toString(dateTime.time(), QLocale::ShortFormat));
+    return QWidget::tr("%1, %2").arg(date(dateTime.date()), time(dateTime.time()));
 }
 
 void useDateFormat(QDateEdit *edit) {

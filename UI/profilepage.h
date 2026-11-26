@@ -7,6 +7,7 @@
 #include <QString>
 #include <QWidget>
 
+class QCheckBox;
 class QComboBox;
 class QDoubleSpinBox;
 class QLabel;
@@ -14,8 +15,9 @@ class QLineEdit;
 class QPushButton;
 class QSpinBox;
 
-// Profile tab (T02): the signed-in account, and corrections to the real balance and
-// days left. Everything here is saved; the Budget tab is only a sandbox.
+// Profile tab (T02): the signed-in account, corrections to the real balance and
+// days left, the password, two-step sign-in and signing out. Everything here is
+// saved; the Budget tab is only a sandbox.
 class ProfilePage : public QWidget {
     Q_OBJECT
 
@@ -35,6 +37,8 @@ signals:
     void balanceUpdated(double newBalance);
     // A days correction was saved or cleared.
     void daysUpdated(int days);
+    // Sign out was chosen; the window returns to the sign-in screen.
+    void signOutRequested();
 
 private:
     void loadEditors();
@@ -44,6 +48,7 @@ private:
     void correctDays();
     void resetDays();
     void changePassword();
+    void setTwoStepSignIn(bool on);
     static void showMessage(QLabel *label, const QString &text, bool error);
     static QString formatPoints(double points);
 
@@ -73,6 +78,9 @@ private:
     QLineEdit *newPassword;
     QLineEdit *confirmPassword;
     QLabel *passwordMessage;
+
+    QCheckBox *twoStepSignIn;
+    QLabel *signInMessage;
 };
 
 #endif // PROFILEPAGE_H

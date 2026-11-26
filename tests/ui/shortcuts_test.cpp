@@ -4,6 +4,7 @@
 
 #include "doctest.h"
 #include "chartspage.h"
+#include "friendspage.h"
 #include "mainui.h"
 #include "planpage.h"
 #include "profilepage.h"
@@ -13,7 +14,6 @@
 #include <QAbstractButton>
 #include <QKeySequence>
 #include <QLabel>
-#include <QMenuBar>
 #include <QTabWidget>
 
 namespace {
@@ -49,15 +49,11 @@ TEST_CASE("No label shows a literal & and no two main window shortcuts share a l
     window.setPurchasePage(new PurchasesPage(account, &window));
     window.addPage(new PlanPage(account, &window), "P&lan");
     window.addPage(new ChartsPage(account, &window), "&Charts");
+    window.addPage(new FriendsPage(account, created.friendId, &window), "&Friends");
     window.addPage(new ProfilePage(account, &window), "P&rofile");
-    window.menuBar()->addMenu("&Account");
-    window.menuBar()->addMenu("&Menus");
 
-    // Menu titles and tab titles work from every page.
+    // Tab titles work from every page.
     QMultiHash<QString, QString> everywhere;
-    for (auto *menu : window.menuBar()->actions()) {
-        everywhere.insert(mnemonicOf(menu->text()), menu->text());
-    }
     auto *tabs = window.findChild<QTabWidget *>();
     REQUIRE(tabs);
     for (int index = 0; index < tabs->count(); ++index) {

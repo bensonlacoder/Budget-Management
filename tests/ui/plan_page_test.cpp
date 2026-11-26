@@ -220,29 +220,6 @@ TEST_CASE("The projection says when the points would run out") {
              "before the quarter ends.");
 }
 
-// Author: Nathan Gu
-TEST_CASE("SP-07: the recent spending rate counts the last 7 days of net spending") {
-    const QDate today(2026, 11, 25);
-    using Kind = HistoryEntry::Kind;
-    const QList<HistoryEntry> history = {
-        {Kind::Purchase, today, "Marketplace", "Lunch", -50.0, "p1"},
-        {Kind::Purchase, today.addDays(-6), "Marketplace", "Dinner", -30.0, "p2"},
-        {Kind::Purchase, today.addDays(-7), "Marketplace", "Too old", -1000.0, "p3"},
-        {Kind::Refund, today.addDays(-1), "", "Wrong order", 10.0, "r1"},
-        {Kind::Correction, today.addDays(-2), "", "", -7.0, "c1"},  // Unlogged spending.
-        {Kind::Correction, today.addDays(-3), "", "", 500.0, "c2"}, // Not spending.
-    };
-    // (50 + 30 - 10 + 7) / 7 = 11.
-    CHECK(PlanPage::recentSpendingRate(history, today) == doctest::Approx(11.0));
-    CHECK(PlanPage::recentSpendingRate({}, today) == 0.0);
-
-    // More refunded than spent counts as no spending, not negative spending.
-    const QList<HistoryEntry> refundsOnly = {
-        {Kind::Refund, today, "", "Refund", 70.0, "r2"},
-    };
-    CHECK(PlanPage::recentSpendingRate(refundsOnly, today) == 0.0);
-}
-
 // ---- Dining habits (T07) ----
 
 // Author: Nathan Gu

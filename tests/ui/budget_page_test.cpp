@@ -224,3 +224,30 @@ TEST_CASE("Days left count down when the date changes while the app is open") {
     CHECK(page.days->value() == 0);
     CHECK(page.daily->text() == "700.00 points");
 }
+
+// Author: Nathan Gu
+TEST_CASE("useRealNumbers replaces the sandbox numbers and reports whether it could") {
+    bool fail = false;
+    double realBalance = 50.0;
+    MainUI window([&]() -> std::optional<MainUI::RealNumbers> {
+        if (fail) {
+            return std::nullopt;
+        }
+        return MainUI::RealNumbers{realBalance, 5};
+    });
+    BudgetPage page(window);
+    page.press("setBalanceButton", 900);
+    page.days->setValue(30);
+
+    realBalance = 70.0;
+    CHECK(window.useRealNumbers());
+    CHECK(page.balance->text() == "70.00 points");
+    CHECK(page.days->value() == 5);
+    CHECK(page.daily->text() == "14.00 points");
+
+    // When the real numbers can't be read, the sandbox numbers stay.
+    page.press("setBalanceButton", 900);
+    fail = true;
+    CHECK_FALSE(window.useRealNumbers());
+    CHECK(page.balance->text() == "900.00 points");
+}

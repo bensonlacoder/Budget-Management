@@ -15,6 +15,7 @@
 #include <QStandardPaths>
 
 #include <limits>
+#include <tuple>
 
 using LocalAccounts::CorrectionMode;
 using LocalAccounts::HistoryEntry;
@@ -57,6 +58,40 @@ void tamper(std::initializer_list<const char *> statements) {
 }
 
 // ---- Accounts ----
+
+// Author: Nathan Gu
+TEST_CASE("The dining plans are SCU's five quarter plans with their starting points") {
+    const auto &plans = LocalAccounts::diningPlans();
+    REQUIRE(plans.size() == 5);
+    const QList<std::tuple<QString, QString, int>> expected = {
+        {"basic", "Basic Plan", 2237},
+        {"preferred", "Preferred Plan", 2617},
+        {"junior-senior", "Junior/Senior Plan", 1536},
+        {"apartment", "Apartment Plan", 336},
+        {"grad", "Graduate Plan", 336},
+    };
+    for (int i = 0; i < plans.size(); ++i) {
+        CAPTURE(i);
+        CHECK(plans[i].id == std::get<0>(expected[i]));
+        CHECK(plans[i].name == std::get<1>(expected[i]));
+        CHECK(plans[i].startingPoints == std::get<2>(expected[i]));
+    }
+    // The same list every time, so pages can keep a reference to it.
+    CHECK(&LocalAccounts::diningPlans() == &plans);
+}
+
+// Author: Nathan Gu
+TEST_CASE("Every dining plan can be chosen at sign-up and starts at its points") {
+    TestAccountStore store;
+    int number = 0;
+    for (const auto &plan : LocalAccounts::diningPlans()) {
+        CAPTURE(plan.id.toStdString());
+        const auto created =
+            createAccount(QString("plan%1@scu.edu").arg(number++), "Planner", plan.id);
+        CHECK(created.diningPlanId == plan.id);
+        CHECK(created.balance == plan.startingPoints);
+    }
+}
 
 TEST_CASE("Sign-up details are validated before anything is saved") {
     TestAccountStore store;
@@ -773,30 +808,6 @@ TEST_CASE("Removing a friend ends the friendship for both accounts") {
     CHECK(friends.accepted.isEmpty());
     // Either of them can send a new request afterwards.
     CHECK(LocalAccounts::sendRequest(bob.accountId, alice.friendId) == Result::Success);
-}
-
-// ---- Saved menu sections ----
-
-TEST_CASE("Menu sections can be saved once, listed and removed") {
-    TestAccountStore store;
-    const auto account = createAccount("menu@scu.edu", "Diner").accountId;
-    CHECK(LocalAccounts::saveSection(account, "   ") == Result::InvalidSettings);
-    CHECK(LocalAccounts::saveSection(account, QString(LocalAccounts::PurchaseTextLimit + 1, 'x'))
-          == Result::InvalidSettings);
-    CHECK(LocalAccounts::saveSection("nobody", "Grill") == Result::StorageError);
-
-    REQUIRE(LocalAccounts::saveSection(account, " Marketplace / Grill ") == Result::Success);
-    REQUIRE(LocalAccounts::saveSection(account, "Marketplace / Grill") == Result::Success);
-    REQUIRE(LocalAccounts::saveSection(account, "Sidebar Cafe") == Result::Success);
-    QStringList sections;
-    REQUIRE(LocalAccounts::loadSavedSections(account, sections));
-    CHECK(sections == QStringList{"Marketplace / Grill", "Sidebar Cafe"});
-
-    REQUIRE(LocalAccounts::removeSection(account, "Marketplace / Grill") == Result::Success);
-    CHECK(LocalAccounts::removeSection(account, "Marketplace / Grill") == Result::SectionUnavailable);
-    REQUIRE(LocalAccounts::loadSavedSections(account, sections));
-    CHECK(sections == QStringList{"Sidebar Cafe"});
-    CHECK_FALSE(LocalAccounts::loadSavedSections("nobody", sections));
 }
 
 // ---- Email codes (T15) ----

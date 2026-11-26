@@ -9,14 +9,11 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QLocale>
-#include <QMainWindow>
-#include <QMenu>
 #include <QPainter>
 #include <QPainterPath>
 #include <QPixmap>
 #include <QPushButton>
 #include <QSignalBlocker>
-#include <QStatusBar>
 #include <QVBoxLayout>
 
 using LocalAccounts::Result;
@@ -450,27 +447,4 @@ void AuthDialog::showError(Result result) {
         message->setText(tr("Could not open the account database. Try again."));
         break;
     }
-}
-
-QAction *addTwoStepSignInAction(QMenu *menu, QMainWindow *window, const QString &account,
-                                bool enabled) {
-    auto *action = menu->addAction(QObject::tr("&Two-step sign-in"));
-    action->setObjectName("twoStepSignInAction");
-    action->setCheckable(true);
-    action->setChecked(enabled);
-    action->setToolTip(QObject::tr("Also ask for a code sent to your email each time you sign in"));
-    QObject::connect(action, &QAction::toggled, window, [action, window, account](bool on) {
-        if (LocalAccounts::setTwoStepSignIn(account, on) != Result::Success) {
-            const QSignalBlocker blocker(action); // Undo the check mark without saving again.
-            action->setChecked(!on);
-            window->statusBar()->showMessage(
-                QObject::tr("Couldn't change two-step sign-in. Try again."));
-            return;
-        }
-        window->statusBar()->showMessage(
-            on ? QObject::tr("Two-step sign-in is on. Each time you sign in, also enter the code "
-                             "we email you.")
-               : QObject::tr("Two-step sign-in is off. You'll sign in with just your password."));
-    });
-    return action;
 }

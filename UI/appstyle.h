@@ -26,6 +26,8 @@ QString points(double points);
 QString date(const QDate &date);
 // "Nov 26"
 QString shortDate(const QDate &date);
+// "8:14 AM", with a plain space before AM or PM.
+QString time(const QTime &time);
 // "Nov 26, 2026, 8:14 AM"
 QString dateTime(const QDateTime &dateTime);
 // Makes a date picker show and accept dates as "Nov 26, 2026".

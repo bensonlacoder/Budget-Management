@@ -132,10 +132,6 @@ bool createSchema(QSqlDatabase &db) {
         " sender_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,"
         " recipient_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,"
         " PRIMARY KEY (sender_id, recipient_id))",
-        "CREATE TABLE IF NOT EXISTS saved_sections ("
-        " account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,"
-        " section TEXT NOT NULL,"
-        " PRIMARY KEY (account_id, section))",
         "CREATE INDEX IF NOT EXISTS purchases_by_account ON purchases(account_id)",
         "CREATE INDEX IF NOT EXISTS refunds_by_purchase ON refunds(purchase_id)",
         // Version 3: sign-up verification and password reset codes (T15).
@@ -1226,54 +1222,6 @@ Result removeFriend(const QString &account, const QString &friendId) {
             return Result::StorageError;
         }
         return query.numRowsAffected() > 0 ? Result::Success : Result::FriendUnavailable;
-    });
-}
-
-// ---- Saved menu sections ----
-
-bool loadSavedSections(const QString &account, QStringList &sections) {
-    sections.clear();
-    return reading([&](QSqlDatabase &db) {
-        if (!exists(db, QStringLiteral("SELECT 1 FROM accounts WHERE id = ?"), {account})) {
-            return false;
-        }
-        QSqlQuery query(db);
-        if (!run(query, QStringLiteral("SELECT section FROM saved_sections WHERE account_id = ?"
-                                       " ORDER BY rowid"), {account})) {
-            return false;
-        }
-        while (query.next()) {
-            sections.append(query.value(0).toString());
-        }
-        return true;
-    });
-}
-
-Result saveSection(const QString &account, const QString &section) {
-    const QString name = section.trimmed();
-    if (name.isEmpty() || name.size() > PurchaseTextLimit) {
-        return Result::InvalidSettings;
-    }
-    return inTransaction([&](QSqlDatabase &db) {
-        if (!exists(db, QStringLiteral("SELECT 1 FROM accounts WHERE id = ?"), {account})) {
-            return Result::StorageError;
-        }
-        QSqlQuery query(db);
-        return run(query, QStringLiteral("INSERT OR IGNORE INTO saved_sections (account_id, section)"
-                                         " VALUES (?, ?)"), {account, name})
-            ? Result::Success
-            : Result::StorageError;
-    });
-}
-
-Result removeSection(const QString &account, const QString &section) {
-    return inTransaction([&](QSqlDatabase &db) {
-        QSqlQuery query(db);
-        if (!run(query, QStringLiteral("DELETE FROM saved_sections WHERE account_id = ? AND section = ?"),
-                 {account, section.trimmed()})) {
-            return Result::StorageError;
-        }
-        return query.numRowsAffected() > 0 ? Result::Success : Result::SectionUnavailable;
     });
 }
 

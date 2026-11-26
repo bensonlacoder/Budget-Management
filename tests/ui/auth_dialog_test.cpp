@@ -9,10 +9,6 @@
 
 #include <QAction>
 #include <QComboBox>
-#include <QMainWindow>
-#include <QMenu>
-#include <QMenuBar>
-#include <QStatusBar>
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
@@ -277,35 +273,4 @@ TEST_CASE("A sign-in code that can't be sent keeps the user on the sign-in scree
     CHECK(form.submit->text() == "&Sign in");
     CHECK(form.password->isVisibleTo(&dialog));
     CHECK_FALSE(form.accepted());
-}
-
-// Author: Nathan Gu
-TEST_CASE("The Account menu turns two-step sign-in on and off") {
-    TestAccountStore store;
-    const auto created = store.createVerified("menu@scu.edu", "Menu");
-    QMainWindow window;
-    QMenu *menu = window.menuBar()->addMenu("&Account");
-    QAction *action = addTwoStepSignInAction(menu, &window, created.accountId, false);
-    REQUIRE(action);
-    CHECK(action->isCheckable());
-    CHECK_FALSE(action->isChecked());
-
-    action->trigger();
-    CHECK(action->isChecked());
-    CHECK(window.statusBar()->currentMessage().startsWith("Two-step sign-in is on."));
-    LocalAccounts::Profile profile;
-    REQUIRE(LocalAccounts::loadProfile(created.accountId, profile));
-    CHECK(profile.twoStepSignIn);
-
-    action->trigger();
-    CHECK_FALSE(action->isChecked());
-    CHECK(window.statusBar()->currentMessage().startsWith("Two-step sign-in is off."));
-    REQUIRE(LocalAccounts::loadProfile(created.accountId, profile));
-    CHECK_FALSE(profile.twoStepSignIn);
-
-    // If the change can't be saved, the check mark goes back.
-    QAction *broken = addTwoStepSignInAction(menu, &window, "no-such-account", false);
-    broken->trigger();
-    CHECK_FALSE(broken->isChecked());
-    CHECK(window.statusBar()->currentMessage() == "Couldn't change two-step sign-in. Try again.");
 }
