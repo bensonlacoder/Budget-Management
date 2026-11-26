@@ -22,16 +22,14 @@ EmailSender::SendFunction &installedSender() {
 
 // Posts the code to the Apps Script web app and waits for {"ok": true}.
 bool sendWithAppsScript(const QString &email, const QString &code, EmailSender::Purpose purpose) {
-    const QSettings settings(EmailSender::configPath(), QSettings::IniFormat);
-    const QUrl url(settings.value("sender/url").toString());
-    const QString secret = settings.value("sender/secret").toString();
-    if (!url.isValid() || url.scheme() != "https" || secret.isEmpty()) {
-        qWarning("EmailSender: no valid url and secret in %s", qPrintable(EmailSender::configPath()));
+    const QUrl url = EmailSender::url();
+    if (!url.isValid() || url.scheme() != "https") {
+        qWarning("EmailSender: sending is off or the url in %s is not https",
+                 qPrintable(EmailSender::configPath()));
         return false;
     }
 
     const QJsonObject body{
-        {"secret", secret},
         {"email", email},
         {"code", code},
         {"purpose", purpose == EmailSender::Purpose::PasswordReset ? "reset"
@@ -82,5 +80,13 @@ QString configPath() {
     }
     return QDir(QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation))
         .filePath("email-sender.ini");
+}
+
+QUrl url() {
+    const QSettings settings(configPath(), QSettings::IniFormat);
+    if (settings.contains("sender/url")) {
+        return QUrl(settings.value("sender/url").toString().trimmed());
+    }
+    return QUrl(QString::fromLatin1(DefaultUrl));
 }
 }

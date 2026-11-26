@@ -16,8 +16,14 @@
 //
 // It also replaces the email sender with a fake that records each code instead of
 // sending it, so no test ever sends real email. Set `sendingFails` to simulate an
-// unreachable sender.
+// unreachable sender. Afterwards it installs refuseToSend, not the real sender.
 struct TestAccountStore {
+    // The sender outside a TestAccountStore: the real one has a built-in URL, so a test
+    // that forgot the fake sender would otherwise send real email.
+    static bool refuseToSend(const QString &, const QString &, EmailSender::Purpose) {
+        return false;
+    }
+
     QString previous = QCoreApplication::applicationName();
     QHash<QString, QString> sentCodes; // Last code sent to each email.
     int emailsSent = 0;
@@ -45,10 +51,10 @@ struct TestAccountStore {
     }
     ~TestAccountStore() {
         current() = nullptr;
-        EmailSender::setSender({});
+        EmailSender::setSender(refuseToSend);
         LocalAccounts::closeStorage(); // Windows can't delete an open database file.
         QDir dir(QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation));
-        for (const char *name : {"budget.sqlite", "budget.sqlite-journal"}) {
+        for (const char *name : {"budget.sqlite", "budget.sqlite-journal", "email-sender.ini"}) {
             QFile::remove(dir.filePath(name));
         }
         QDir().rmdir(dir.absolutePath());

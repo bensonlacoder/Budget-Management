@@ -10,6 +10,7 @@
 #include <QTest>
 
 #include "mainui.h"
+#include "test_account_store.h"
 
 TEST_CASE("Invalid day entry explains the limit and preserves the budget") {
     // The sandbox starts from 0 points and 77 days.
@@ -95,5 +96,6 @@ TEST_CASE("Invalid day entry explains the limit and preserves the budget") {
 
 int main(int argc, char **argv) {
     QApplication app(argc, argv);
+    EmailSender::setSender(TestAccountStore::refuseToSend); // No test sends real email.
     return doctest::Context(argc, argv).run();
 }
