@@ -114,7 +114,10 @@ ProfilePage::ProfilePage(const QString &accountName, QWidget *parent)
     correctionRow->addWidget(correctionMode);
     correctionRow->addWidget(correctionAmount, 1);
     correctionRow->addWidget(correctButton);
-    balanceForm->addRow(tr("Correct &balance:"), correctionRow);
+    // Rows whose field is a layout need their buddy set by hand (see planpage.cpp).
+    auto *correctionLabel = new QLabel(tr("Correc&t balance:"), balanceBox);
+    correctionLabel->setBuddy(correctionMode);
+    balanceForm->addRow(correctionLabel, correctionRow);
     balanceMessage = messageLabel("balanceMessage", balanceBox);
     balanceForm->addRow(QString(), balanceMessage);
     layout->addWidget(balanceBox);
@@ -143,7 +146,9 @@ ProfilePage::ProfilePage(const QString &accountName, QWidget *parent)
     daysRow->addWidget(daysCorrection, 1);
     daysRow->addWidget(correctDaysButton);
     daysRow->addWidget(resetDaysButton);
-    daysForm->addRow(tr("Correct &days:"), daysRow);
+    auto *daysCorrectionLabel = new QLabel(tr("Correct &days:"), daysBox);
+    daysCorrectionLabel->setBuddy(daysCorrection);
+    daysForm->addRow(daysCorrectionLabel, daysRow);
     daysMessage = messageLabel("daysMessage", daysBox);
     daysForm->addRow(QString(), daysMessage);
     layout->addWidget(daysBox);
@@ -154,7 +159,7 @@ ProfilePage::ProfilePage(const QString &accountName, QWidget *parent)
     currentPassword = passwordEdit("currentPasswordEdit", passwordBox);
     newPassword = passwordEdit("newPasswordEdit", passwordBox);
     confirmPassword = passwordEdit("confirmPasswordEdit", passwordBox);
-    passwordForm->addRow(tr("&Current password:"), currentPassword);
+    passwordForm->addRow(tr("C&urrent password:"), currentPassword);
     passwordForm->addRow(tr("Ne&w password:"), newPassword);
     passwordForm->addRow(tr("Con&firm new password:"), confirmPassword);
     auto *changePasswordButton =

@@ -50,7 +50,7 @@
          </item>
          <item row="1" column="0">
           <widget class="QLabel" name="amountLabel">
-           <property name="text"><string>&amp;Amount:</string></property>
+           <property name="text"><string>Am&amp;ount:</string></property>
            <property name="buddy"><cstring>amountSpinBox</cstring></property>
           </widget>
          </item>
