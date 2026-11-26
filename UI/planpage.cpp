@@ -9,6 +9,7 @@
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFormLayout>
+#include <QGridLayout>
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -41,6 +42,23 @@ QLabel *namedLabel(const char *name, QWidget *parent, bool bold = false) {
     return label;
 }
 
+// Point sizes for the Plan tab's figures. The headline matches the Budget tab's
+// heading (18); the other limits stay a clear step below it.
+constexpr int HEADLINE_POINTS = 18;
+constexpr int FIGURE_POINTS = 12;
+constexpr int GROUP_SPACING = 10;
+
+QFont sizedFont(QFont font, int points, bool bold) {
+    font.setPointSize(points);
+    font.setBold(bold);
+    return font;
+}
+
+// A caption above a figure.
+QLabel *captionLabel(const QString &text, QWidget *parent) {
+    return new QLabel(text, parent);
+}
+
 QString dayCount(int days) {
     return days == 1 ? PlanPage::tr("1 day") : PlanPage::tr("%1 days").arg(days);
 }
@@ -58,34 +76,73 @@ PlanPage::PlanPage(const QString &accountName, QWidget *parent)
     alertsBanner->hide();
     layout->addWidget(alertsBanner);
 
-    // ---- Advice ----
+    // ---- Advice: today's figure first, then the rest ----
     auto *adviceBox = new QGroupBox(tr("Your spending plan"), content);
-    auto *adviceForm = new QFormLayout(adviceBox);
+    auto *adviceLayout = new QVBoxLayout(adviceBox);
+    dailyLabel = namedLabel("dailyBudgetLabel", adviceBox);
+    dailyLabel->setFont(sizedFont(dailyLabel->font(), HEADLINE_POINTS, true));
+    dailyLabel->setWordWrap(false);
+    auto *headline = new QHBoxLayout;
+    headline->addWidget(new QLabel(tr("Spend up to"), adviceBox), 0, Qt::AlignBaseline);
+    headline->addWidget(dailyLabel, 0, Qt::AlignBaseline);
+    headline->addWidget(new QLabel(tr("per day"), adviceBox), 0, Qt::AlignBaseline);
+    headline->addStretch();
+    adviceLayout->addLayout(headline);
+    adviceLayout->addSpacing(GROUP_SPACING);
+
+    // Other limits, each a caption over its figure.
+    weeklyLabel = namedLabel("weeklyBudgetLabel", adviceBox, true);
+    perMealLabel = namedLabel("perMealLabel", adviceBox, true);
+    perCampusDayLabel = namedLabel("perCampusDayLabel", adviceBox, true);
+    auto *limits = new QGridLayout;
+    limits->setHorizontalSpacing(24);
+    const std::pair<QString, QLabel *> limitCells[] = {
+        {tr("Next 7 days"), weeklyLabel},
+        {tr("Per meal"), perMealLabel},
+        {tr("Per campus day"), perCampusDayLabel},
+    };
+    int column = 0;
+    for (const auto &[caption, value] : limitCells) {
+        value->setFont(sizedFont(value->font(), FIGURE_POINTS, true));
+        limits->addWidget(captionLabel(caption, adviceBox), 0, column);
+        limits->addWidget(value, 1, column);
+        limits->setColumnStretch(column, 1);
+        ++column;
+    }
+    adviceLayout->addLayout(limits);
+    campusLabel = namedLabel("campusDaysLabel", adviceBox);
+    adviceLayout->addWidget(campusLabel);
+    adviceLayout->addSpacing(GROUP_SPACING);
+
+    // Where the figures come from.
     balanceLabel = namedLabel("planBalanceLabel", adviceBox);
     daysLabel = namedLabel("planDaysLabel", adviceBox);
     spendableLabel = namedLabel("spendableLabel", adviceBox);
-    dailyLabel = namedLabel("dailyBudgetLabel", adviceBox, true);
-    weeklyLabel = namedLabel("weeklyBudgetLabel", adviceBox, true);
-    adviceForm->addRow(tr("Points left:"), balanceLabel);
-    adviceForm->addRow(tr("Days left (including today):"), daysLabel);
-    adviceForm->addRow(tr("Points to spend (after reserve):"), spendableLabel);
-    adviceForm->addRow(tr("Spend up to per day:"), dailyLabel);
-    adviceForm->addRow(tr("Spend up to over the next 7 days:"), weeklyLabel);
-    perMealLabel = namedLabel("perMealLabel", adviceBox, true);
-    perCampusDayLabel = namedLabel("perCampusDayLabel", adviceBox, true);
-    campusLabel = namedLabel("campusDaysLabel", adviceBox);
-    adviceForm->addRow(tr("Spend up to per meal:"), perMealLabel);
-    adviceForm->addRow(tr("Spend up to per campus day:"), perCampusDayLabel);
-    adviceForm->addRow(QString(), campusLabel);
+    auto *sources = new QFormLayout;
+    sources->addRow(tr("Points left:"), balanceLabel);
+    sources->addRow(tr("Days left (including today):"), daysLabel);
+    sources->addRow(tr("Points to spend after your reserve:"), spendableLabel);
+    adviceLayout->addLayout(sources);
     loadMessage = namedLabel("planLoadMessage", adviceBox);
-    adviceForm->addRow(QString(), loadMessage);
+    loadMessage->hide();
+    adviceLayout->addWidget(loadMessage);
     layout->addWidget(adviceBox);
+
+    // ---- Projection, right under the plan it checks ----
+    auto *projectionBox = new QGroupBox(tr("End of quarter"), content);
+    auto *projectionLayout = new QVBoxLayout(projectionBox);
+    projectionLabel = namedLabel("projectionLabel", projectionBox);
+    reserveWarning = namedLabel("reserveWarningLabel", projectionBox, true);
+    reserveWarning->setStyleSheet(QStringLiteral("color: #b00020;"));
+    projectionLayout->addWidget(projectionLabel);
+    projectionLayout->addWidget(reserveWarning);
+    layout->addWidget(projectionBox);
 
     // ---- Reserve goal ----
     auto *reserveBox = new QGroupBox(tr("Reserve goal"), content);
     auto *reserveForm = new QFormLayout(reserveBox);
     auto *reserveHelp = new QLabel(
-        tr("Points to keep at the end of the quarter. The advice above leaves them out."),
+        tr("Points to keep at the end of the quarter. The plan above leaves them out."),
         reserveBox);
     reserveHelp->setWordWrap(true);
     reserveForm->addRow(reserveHelp);
@@ -93,7 +150,7 @@ PlanPage::PlanPage(const QString &accountName, QWidget *parent)
     reserveEdit->setObjectName("reserveGoalSpinBox");
     reserveEdit->setDecimals(2);
     reserveEdit->setRange(0.0, LocalAccounts::MaxPurchasePoints);
-    reserveEdit->setSuffix(tr(" pts"));
+    reserveEdit->setSuffix(tr(" points"));
     auto *saveButton = new QPushButton(tr("Save reserve"), reserveBox);
     saveButton->setObjectName("saveReserveButton");
     auto *reserveRow = new QHBoxLayout;
@@ -105,39 +162,51 @@ PlanPage::PlanPage(const QString &accountName, QWidget *parent)
     reserveLabel->setBuddy(reserveEdit);
     reserveForm->addRow(reserveLabel, reserveRow);
     reserveMessage = namedLabel("reserveMessage", reserveBox);
-    reserveForm->addRow(QString(), reserveMessage);
+    reserveMessage->hide();
+    reserveForm->addRow(reserveMessage);
     layout->addWidget(reserveBox);
 
-    // ---- Dining habits ----
+    // ---- Dining habits: one row for the week ----
     auto *habitsBox = new QGroupBox(tr("Dining habits"), content);
-    auto *habitsForm = new QFormLayout(habitsBox);
+    auto *habitsLayout = new QVBoxLayout(habitsBox);
     auto *habitsHelp = new QLabel(
         tr("Meals you usually eat on campus each day. Enter 0 for days you're not on "
            "campus. Changes are saved right away."),
         habitsBox);
     habitsHelp->setWordWrap(true);
-    habitsForm->addRow(habitsHelp);
-    const QStringList dayNames = {tr("Mo&nday:"), tr("T&uesday:"), tr("&Wednesday:"),
-                                  tr("T&hursday:"), tr("&Friday:"), tr("&Saturday:"),
-                                  tr("Sunda&y:")};
+    habitsLayout->addWidget(habitsHelp);
+    const QStringList dayNames = {tr("Mo&n"), tr("Tu&e"), tr("&Wed"), tr("T&hu"),
+                                  tr("&Fri"), tr("&Sat"), tr("S&un")};
+    const QStringList fullDayNames = {tr("Monday"), tr("Tuesday"), tr("Wednesday"),
+                                      tr("Thursday"), tr("Friday"), tr("Saturday"),
+                                      tr("Sunday")};
     static const char *const editNames[] = {"mealsMonday", "mealsTuesday", "mealsWednesday",
                                             "mealsThursday", "mealsFriday", "mealsSaturday",
                                             "mealsSunday"};
+    auto *week = new QGridLayout;
     for (int day = 0; day < DAYS_PER_WEEK; ++day) {
         auto *edit = new QSpinBox(habitsBox);
         edit->setObjectName(QLatin1String(editNames[day]));
         edit->setRange(0, LocalAccounts::MaxMealsPerDay);
-        edit->setSuffix(tr(" meals"));
+        edit->setAccessibleName(tr("Meals on campus on %1").arg(fullDayNames.at(day)));
         mealEdits[static_cast<size_t>(day)] = edit;
-        habitsForm->addRow(dayNames.at(day), edit);
+        auto *dayLabel = new QLabel(dayNames.at(day), habitsBox);
+        dayLabel->setBuddy(edit);
+        week->addWidget(dayLabel, 0, day);
+        week->addWidget(edit, 1, day);
+        week->setColumnStretch(day, 1);
         connect(edit, &QSpinBox::valueChanged, this, &PlanPage::habitsEdited);
     }
+    habitsLayout->addLayout(week);
     auto *uploadButton = new QPushButton(tr("Upload CS&V..."), habitsBox);
     uploadButton->setObjectName("uploadHabitsButton");
     uploadButton->setToolTip(tr("A file with one line per day, like \"Monday,2\"."));
-    habitsForm->addRow(QString(), uploadButton);
     habitsMessage = namedLabel("habitsMessage", habitsBox);
-    habitsForm->addRow(QString(), habitsMessage);
+    habitsMessage->hide();
+    auto *habitsFooter = new QHBoxLayout;
+    habitsFooter->addWidget(habitsMessage, 1);
+    habitsFooter->addWidget(uploadButton, 0, Qt::AlignRight | Qt::AlignTop);
+    habitsLayout->addLayout(habitsFooter);
     layout->addWidget(habitsBox);
 
     // ---- Alerts ----
@@ -151,20 +220,11 @@ PlanPage::PlanPage(const QString &accountName, QWidget *parent)
         alertsBox);
     runOutAlert->setObjectName("runOutAlertCheckBox");
     alertsMessage = namedLabel("alertsMessage", alertsBox);
+    alertsMessage->hide();
     alertsLayout->addWidget(overDailyAlert);
     alertsLayout->addWidget(runOutAlert);
     alertsLayout->addWidget(alertsMessage);
     layout->addWidget(alertsBox);
-
-    // ---- Projection ----
-    auto *projectionBox = new QGroupBox(tr("End of quarter"), content);
-    auto *projectionLayout = new QVBoxLayout(projectionBox);
-    projectionLabel = namedLabel("projectionLabel", projectionBox);
-    reserveWarning = namedLabel("reserveWarningLabel", projectionBox, true);
-    reserveWarning->setStyleSheet(QStringLiteral("color: #b00020;"));
-    projectionLayout->addWidget(projectionLabel);
-    projectionLayout->addWidget(reserveWarning);
-    layout->addWidget(projectionBox);
     layout->addStretch();
 
     auto *scroll = new QScrollArea(this);
@@ -253,6 +313,7 @@ void PlanPage::refresh() {
     budget.setRecentSpendingRate(recentSpendingRate(history, shownDate));
     spentToday = netSpending(history, shownDate, shownDate);
     loadMessage->clear();
+    loadMessage->hide();
     showAdvice();
 }
 
@@ -486,6 +547,7 @@ void PlanPage::showAdvice() {
 void PlanPage::showMessage(QLabel *label, const QString &text, bool error) {
     label->setStyleSheet(error ? QStringLiteral("color: #b00020;") : QString());
     label->setText(text);
+    label->setVisible(!text.isEmpty());
 }
 
 QString PlanPage::formatPoints(double points) {
