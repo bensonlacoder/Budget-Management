@@ -190,6 +190,24 @@ count outside 0 to 10 is rejected and the previous habits are kept.
 - With no habits entered, or no campus days left, both suggestions are 0 and the
   Plan tab shows only the daily and weekly advice.
 - Suggestions update when the balance, days remaining, reserve or habits change.
+- On the Plan tab, each weekday has a meals box (0 to 10). A change is saved right away.
+
+**Uploading habits (CSV):** **Upload CSV...** reads a text file with one day per line,
+the day and its meals separated by a comma:
+
+```csv
+day,meals
+Monday,2
+Wednesday,3
+Fri,1
+```
+
+- The `day,meals` header is optional. Blank lines and spaces around values are ignored.
+- Days are full English names or three-letter abbreviations, in any case. Days not
+  listed have 0 meals, and each day may be listed only once.
+- Meals are whole numbers from 0 to 10. At least one day must be listed.
+- Files over 10 KB are rejected. If any line is wrong, nothing changes and the message
+  names the first bad line, for example `Line 3: "Funday" isn't a day of the week.`
 
 **Test cases:** with 2 meals on Monday through Friday, 14 days starting on a Monday
 have 10 campus days and 20 meals; with 400 spendable points that is 20 per meal and

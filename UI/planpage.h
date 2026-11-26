@@ -10,11 +10,15 @@
 #include <QString>
 #include <QWidget>
 
+#include <array>
+#include <functional>
+
 class QDoubleSpinBox;
 class QLabel;
+class QSpinBox;
 
-// Plan tab: real spending advice from the saved balance, days left and reserve goal
-// (T06), with dining habits (T07) and alerts (T13) to follow. The numbers come from
+// Plan tab: real spending advice from the saved balance, days left, reserve goal (T06)
+// and dining habits (T07), with alerts (T13) to follow. The numbers come from
 // Budget; this page only loads, saves and shows them.
 class PlanPage : public QWidget {
     Q_OBJECT
@@ -33,9 +37,20 @@ public:
 
     static constexpr int SpendingWindowDays = 7;
 
+    // Reads dining habits from a CSV file (format in SP-08), saves them and shows the
+    // result. Upload CSV... calls this with the chosen file. A bad file shows a
+    // message and changes nothing.
+    bool loadHabitsFile(const QString &path);
+
 private:
     void saveReserve();
+    bool saveSettings(const std::function<void(LocalAccounts::PlanSettings &)> &change);
+    void habitsEdited();
+    bool applyHabits(const Budget::DiningHabits &habits, const QString &savedMessage);
+    void showHabits(const Budget::DiningHabits &habits);
+    void chooseHabitsFile();
     void showAdvice();
+    void showSuggestions();
     static void showMessage(QLabel *label, const QString &text, bool error);
     static QString formatPoints(double points);
 
@@ -51,10 +66,16 @@ private:
     QLabel *spendableLabel;
     QLabel *dailyLabel;
     QLabel *weeklyLabel;
+    QLabel *perMealLabel;
+    QLabel *perCampusDayLabel;
+    QLabel *campusLabel;
     QLabel *loadMessage;
 
     QDoubleSpinBox *reserveEdit;
     QLabel *reserveMessage;
+
+    std::array<QSpinBox *, 7> mealEdits{}; // Monday first.
+    QLabel *habitsMessage;
 
     QLabel *projectionLabel;
     QLabel *reserveWarning;

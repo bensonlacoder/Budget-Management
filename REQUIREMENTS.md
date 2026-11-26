@@ -57,7 +57,7 @@
 | ✅ FR-36 | Try different point balances, days remaining, and spending plans in a sandbox that starts from the real values and never changes the saved balance, purchase history, or balance shared with friends. |
 | FR-47 | Correct the real balance from the profile page by setting, adding, or subtracting points. Each correction appears in history as a balance correction, and a correction that lowers the balance counts as unlogged spending in charts and totals. |
 | ✅ FR-37 | Enter how many points to keep in reserve at the end of the quarter. |
-| FR-38 | Enter or upload usual dining habits, including which days they eat on campus and how many meals they eat on those days. |
+| ✅ FR-38 | Enter or upload usual dining habits, including which days they eat on campus and how many meals they eat on those days. |
 
 ### Receive advice
 
@@ -65,8 +65,8 @@
 | --- | --- |
 | ✅ FR-06 | See how many dining points they can spend per day. |
 | ✅ FR-07 | See how many dining points they can spend over the next seven days or through the quarter end if sooner. |
-| FR-39 | Get spending suggestions based on the current balance, time remaining, reserve goal, and dining habits. Use the days remaining from the quarter calendar, or the manually corrected count when there is one. |
-| FR-40 | See spending recommendations refresh after changes to the balance, remaining time, reserve goal, or dining habits. |
+| ✅ FR-39 | Get spending suggestions based on the current balance, time remaining, reserve goal, and dining habits. Use the days remaining from the quarter calendar, or the manually corrected count when there is one. |
+| ✅ FR-40 | See spending recommendations refresh after changes to the balance, remaining time, reserve goal, or dining habits. |
 | FR-41 | Choose separately whether to receive alerts for going over the daily budget and for running out of points before the quarter ends. |
 | FR-42 | Receive enabled alerts when recorded spending exceeds the daily budget or projected spending would exhaust the balance before quarter end. |
 | ✅ FR-43 | See when projected spending would leave fewer points than the end-of-quarter reserve goal. |
