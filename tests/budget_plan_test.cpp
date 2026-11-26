@@ -204,3 +204,44 @@ TEST_CASE("SP-08: invalid habits or weekdays are rejected without changing anyth
     CHECK(budget.getRemainingCampusMeals(8) == 0);
     CHECK(budget.getPerMealBudget(0) == 0.0);
 }
+
+// ---- Today's budget (alerts) ----
+
+// Author: Nathan Gu
+TEST_CASE("SP-09: today's budget comes from the balance before today's spending") {
+    Balance balance(695.0); // After spending 25 today.
+    Budget budget(balance, 72);
+    CHECK(budget.getTodaysBudget(25.0) == doctest::Approx(10.0));
+    CHECK(budget.isOverTodaysBudget(25.0));
+
+    balance.setBalance(710.0); // After spending exactly 10.
+    CHECK(budget.getTodaysBudget(10.0) == doctest::Approx(10.0));
+    CHECK_FALSE(budget.isOverTodaysBudget(10.0));
+    CHECK_FALSE(budget.isOverTodaysBudget(0.0));
+}
+
+// Author: Nathan Gu
+TEST_CASE("SP-09: today's budget leaves out the reserve and ignores net refunds") {
+    Balance balance(695.0);
+    Budget budget(balance, 72);
+    budget.setReserveGoal(72.0);
+    CHECK(budget.getTodaysBudget(25.0) == doctest::Approx(9.0)); // (720 - 72) / 72
+    CHECK(budget.isOverTodaysBudget(25.0));
+
+    balance.setBalance(711.0); // After spending exactly today's 9.
+    CHECK_FALSE(budget.isOverTodaysBudget(9.0));
+    balance.setBalance(710.99); // After spending 9.01.
+    CHECK(budget.isOverTodaysBudget(9.01));
+    balance.setBalance(695.0);
+
+    // More refunded than spent today: the budget isn't raised and nothing is over.
+    CHECK(budget.getTodaysBudget(-50.0) == doctest::Approx(budget.getDailyBudget()));
+    CHECK_FALSE(budget.isOverTodaysBudget(-50.0));
+
+    // On the last day, today's budget is everything spendable.
+    budget.setRemainingDays(0);
+    CHECK(budget.getTodaysBudget(25.0) == doctest::Approx(648.0));
+
+    CHECK_THROWS_AS(budget.getTodaysBudget(std::numeric_limits<double>::quiet_NaN()),
+                    std::invalid_argument);
+}
