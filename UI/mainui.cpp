@@ -1,4 +1,5 @@
 #include "mainui.h"
+#include "appstyle.h"
 #include "ui_mainui.h"
 
 #include "quarter.h"
@@ -13,7 +14,6 @@
 #include <utility>
 
 namespace {
-constexpr int POINT_DECIMAL_PLACES = 2;
 constexpr int DATE_CHECK_INTERVAL_MS = 60 * 1000;
 constexpr int MAX_REMAINING_DAYS = 90; // Budget's upper limit.
 
@@ -29,6 +29,8 @@ MainUI::MainUI(RealNumbersLoader loadRealNumbers, QWidget *parent)
       loadRealNumbers(loadRealNumbers ? std::move(loadRealNumbers) : noSavedNumbers),
       shownDate(QDate::currentDate()) {
     ui->setupUi(this);
+    // A tinted notice, so the sandbox is never mistaken for the real numbers.
+    ui->sandboxLabel->setStyleSheet(AppStyle::noticeBanner(this));
     ui->amountSpinBox->installEventFilter(this);
     budgetPage = centralWidget();
 
@@ -190,5 +192,5 @@ void MainUI::refreshDisplay() {
 }
 
 QString MainUI::formatPoints(double points) {
-    return tr("%1 points").arg(points, 0, 'f', POINT_DECIMAL_PLACES);
+    return AppStyle::points(points);
 }

@@ -1,4 +1,5 @@
 #include "purchasespage.h"
+#include "appstyle.h"
 #include "historylocations.h"
 #include "quarter.h"
 
@@ -46,6 +47,7 @@ void configurePurchaseDate(QDateEdit *edit, const QDate &existing = {}) {
     const auto today = QDate::currentDate();
     const auto quarter = Quarter::statusOn(today);
     edit->setCalendarPopup(true);
+    AppStyle::useDateFormat(edit);
     edit->setMaximumDate(today);
     if (quarter.phase == Quarter::Phase::InQuarter) {
         edit->setMinimumDate(existing.isValid() ? std::min(existing, quarter.term.start)
@@ -140,7 +142,7 @@ PurchasesPage::PurchasesPage(const QString &accountName, QWidget *parent)
     points->setDecimals(2);
     points->setMaximum(LocalAccounts::MaxPurchasePoints);
     points->setSpecialValueText(tr("Enter receipt total"));
-    points->setSuffix(tr(" pts"));
+    points->setSuffix(tr(" points"));
     feedback->setWordWrap(true);
     feedback->setObjectName("purchaseFeedback");
 
@@ -195,6 +197,8 @@ PurchasesPage::PurchasesPage(const QString &accountName, QWidget *parent)
     filterLocation->setObjectName("historyLocation");
     filterFrom->setCalendarPopup(true);
     filterTo->setCalendarPopup(true);
+    AppStyle::useDateFormat(filterFrom);
+    AppStyle::useDateFormat(filterTo);
     filterFrom->setEnabled(false);
     filterTo->setEnabled(false);
     // All filters in one row: dates, then location, then Clear.
@@ -285,7 +289,7 @@ void PurchasesPage::showFeedback(const QString &text) {
 }
 
 void PurchasesPage::showBalance(double balance) {
-    balanceLabel->setText(tr("Balance: %1 points").arg(locale().toString(balance, 'f', 2)));
+    balanceLabel->setText(tr("Balance: %1").arg(AppStyle::points(balance)));
     refreshHistory();
 }
 
@@ -310,8 +314,8 @@ void PurchasesPage::updateMenuItems() {
             if (option.priceInHundredths == ScuMenu::ReceiptPrice) {
                 label += tr(" (receipt total)");
             } else {
-                const QString price = locale().toString(option.priceInHundredths / 100.0, 'f', 2);
-                label += option.choices.isEmpty() ? tr(" (%1 pts)").arg(price) : tr(" (from %1 pts)").arg(price);
+                const QString price = AppStyle::points(option.priceInHundredths / 100.0);
+                label += option.choices.isEmpty() ? tr(" (%1)").arg(price) : tr(" (from %1)").arg(price);
             }
             menuItem->addItem(label, loc);
             menuItem->setItemData(menuItem->count() - 1, index, ITEM_INDEX_ROLE);
@@ -397,8 +401,8 @@ QString PurchasesPage::hoursText(const ScuMenu::Schedule &schedule, QTime now) c
 
     QStringList hours;
     for (const auto &window : schedule.hours) {
-        const QString range = tr("%1 to %2").arg(locale().toString(window.opens, QLocale::ShortFormat),
-                                                  locale().toString(window.closes, QLocale::ShortFormat));
+        const QString range = tr("%1 to %2").arg(AppStyle::locale().toString(window.opens, QLocale::ShortFormat),
+                                                  AppStyle::locale().toString(window.closes, QLocale::ShortFormat));
         if (!hours.contains(range)) {
             hours.append(range);
         }
@@ -445,12 +449,12 @@ void PurchasesPage::useMenuItem(int index) {
         for (const auto &option : currentItem->choices) {
             const QString label = option.priceInHundredths == ScuMenu::ReceiptPrice
                 ? tr("%1 (receipt total)").arg(option.name)
-                : tr("%1 (%2 pts)").arg(option.name, locale().toString(option.priceInHundredths / 100.0, 'f', 2));
+                : tr("%1 (%2)").arg(option.name, AppStyle::points(option.priceInHundredths / 100.0));
             choice->addItem(label);
         }
         for (const auto &extra : currentItem->extras) {
-            const QString price = locale().toString(extra.priceInHundredths / 100.0, 'f', 2);
-            auto *check = new QCheckBox(tr("%1 (+%2 pts)").arg(extra.name, price), extras);
+            const QString price = AppStyle::points(extra.priceInHundredths / 100.0);
+            auto *check = new QCheckBox(tr("%1 (+%2)").arg(extra.name, price), extras);
             const int pos = extraChecks.size();
             extrasLayout->addWidget(check, pos / 2, pos % 2);
             extraChecks.append(check);
@@ -654,6 +658,7 @@ void PurchasesPage::refundDialog(const LocalAccounts::Refund &refund) {
     QDateEdit when(refund.date, &dialog);
     when.setObjectName("refundDate");
     when.setCalendarPopup(true);
+    AppStyle::useDateFormat(&when);
     when.setMaximumDate(QDate::currentDate());
     // A linked refund can't come before its purchase.
     for (const auto &row : std::as_const(entries)) {
@@ -748,9 +753,9 @@ void PurchasesPage::renderHistory() {
             description = entry.item.isEmpty() ? tr("Refund") : tr("Refund — %1").arg(entry.item);
         }
         const QString change = (entry.balanceChange > 0 ? QStringLiteral("+") : QString())
-            + locale().toString(entry.balanceChange, 'f', 2);
+            + AppStyle::number(entry.balanceChange);
         const QString values[] = {
-            locale().toString(entry.date, QLocale::ShortFormat), entry.location, description, change};
+            AppStyle::date(entry.date), entry.location, description, change};
         for (int column = 0; column < 4; ++column) {
             auto *cell = new QTableWidgetItem(values[column]);
             if (entry.kind == Kind::Correction) {

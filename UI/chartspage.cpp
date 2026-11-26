@@ -1,4 +1,5 @@
 #include "chartspage.h"
+#include "appstyle.h"
 #include "historylocations.h"
 
 #include "budget.h"
@@ -40,13 +41,16 @@ void setRow(QTableWidget *table, int row, const QStringList &values) {
 class SpendingChart : public QWidget {
 public:
     explicit SpendingChart(QWidget *parent) : QWidget(parent) {
-        setMinimumHeight(145);
+        setMinimumHeight(165);
         setAccessibleName(tr("Net spending and budget by period"));
     }
 
-    void setData(const QList<qint64> &values, const QList<qint64> &targets) {
+    // `labels` names each bar, for example "Nov 26".
+    void setData(const QList<qint64> &values, const QList<qint64> &targets,
+                 const QStringList &labels = {}) {
         actual = values;
         budget = targets;
+        names = labels;
         update();
     }
 
@@ -59,11 +63,14 @@ protected:
         const qint64 bottom = std::min<qint64>(0, *bounds.first);
         const qint64 top = std::max({qint64(1), *std::max_element(budget.cbegin(), budget.cend()), *bounds.second});
         QPainter painter(this);
-        const QString high = locale().toString(top / 100.0, 'f', 2);
-        const QString low = locale().toString(bottom / 100.0, 'f', 2);
+        const QString high = AppStyle::number(top / 100.0);
+        const QString low = AppStyle::number(bottom / 100.0);
         const int labelWidth = qMax(fontMetrics().horizontalAdvance(high),
                                    fontMetrics().horizontalAdvance(low));
-        const QRectF plot = QRectF(rect()).adjusted(labelWidth + 12, 12, -12, -25);
+        const int lineHeight = fontMetrics().height();
+        // Room under the bars for their dates, then the legend.
+        const QRectF plot =
+            QRectF(rect()).adjusted(labelWidth + 12, 12, -12, -(25 + lineHeight + 4));
         const auto y = [&](qint64 value) {
             return plot.bottom() - plot.height() * (value - bottom) / (top - bottom);
         };
@@ -89,13 +96,28 @@ protected:
         }
         painter.drawPolyline(reference);
         painter.setPen(axis);
-        painter.drawText(QRectF(0, plot.bottom() + 7, width(), 18), Qt::AlignCenter,
+
+        // Dates under the bars. When they wouldn't fit side by side, only every
+        // `every`-th bar is labelled, always starting with the first.
+        int widest = 0;
+        for (const QString &name : std::as_const(names)) {
+            widest = std::max(widest, fontMetrics().horizontalAdvance(name));
+        }
+        const int every = std::max(1, static_cast<int>(std::ceil((widest + 8) / step)));
+        for (int i = 0; i < names.size() && i < actual.size(); i += every) {
+            painter.drawText(QRectF(plot.left() + i * step - (every - 1) * step / 2,
+                                    plot.bottom() + 4, step * every, lineHeight),
+                             Qt::AlignHCenter | Qt::AlignTop, names.at(i));
+        }
+
+        painter.drawText(QRectF(0, plot.bottom() + lineHeight + 8, width(), 18), Qt::AlignCenter,
                          tr("Bars: actual net points   ·   Dashed line: budget"));
     }
 
 private:
     QList<qint64> actual;
     QList<qint64> budget;
+    QStringList names;
 };
 
 ChartsPage::ChartsPage(const QString &accountName, QWidget *parent)
@@ -108,6 +130,8 @@ ChartsPage::ChartsPage(const QString &accountName, QWidget *parent)
     to->setObjectName("chartsTo");
     from->setCalendarPopup(true);
     to->setCalendarPopup(true);
+    AppStyle::useDateFormat(from);
+    AppStyle::useDateFormat(to);
     // Budgets are only known up to today.
     from->setMaximumDate(QDate::currentDate());
     to->setMaximumDate(QDate::currentDate());
@@ -245,7 +269,7 @@ void ChartsPage::refresh() {
         LocalAccounts::MaxRemainingDays);
     const auto budgets = dailyBudgets(history, profile.balance, settings.reserveGoal, days,
                                       today, start, end);
-    const auto format = [this](qint64 value) { return locale().toString(value / 100.0, 'f', 2); };
+    const auto format = [](qint64 value) { return AppStyle::number(value / 100.0); };
 
     // Biggest net spending first; ties stay in name order.
     QList<std::pair<QString, qint64>> byPoints;
@@ -262,6 +286,7 @@ void ChartsPage::refresh() {
 
     QList<qint64> actual;
     QList<qint64> targets;
+    QStringList names;
     const QDate firstPeriod = periodStart(start, weekly);
     const int step = weekly ? 7 : 1;
     comparison->setRowCount(firstPeriod.daysTo(end) / step + 1);
@@ -276,16 +301,17 @@ void ChartsPage::refresh() {
         const qint64 total = spending.periods.value(date);
         const qint64 difference = total - target;
         const QString label = weekly
-            ? tr("Week of %1").arg(locale().toString(date, QLocale::ShortFormat))
-            : locale().toString(date, QLocale::ShortFormat);
+            ? tr("Week of %1").arg(AppStyle::date(date))
+            : AppStyle::date(date);
         const QString delta = difference == 0 ? tr("On budget")
             : difference > 0 ? tr("%1 over").arg(format(difference))
                              : tr("%1 under").arg(format(-difference));
         setRow(comparison, i, {label, format(total), format(target), delta});
         actual.append(total);
         targets.append(target);
+        names.append(AppStyle::shortDate(date));
     }
-    chart->setData(actual, targets);
+    chart->setData(actual, targets, names);
     chart->show();
     comparison->show();
     locations->show();
