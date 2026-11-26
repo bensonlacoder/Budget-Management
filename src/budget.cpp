@@ -1,5 +1,6 @@
 #include "budget.h"
 
+#include <algorithm>
 #include <cmath>
 #include <stdexcept>
 
@@ -9,10 +10,16 @@ namespace {
 double floorToHundredths(double points) {
     return std::floor(points * 100.0 + 1e-6) / 100.0;
 }
+
+// True if two point amounts are the same to the hundredth.
+bool samePoints(double left, double right) {
+    return std::llround(left * 100.0) == std::llround(right * 100.0);
+}
 }
 
 Budget::Budget(const Balance &balance, int remainingDays)
-    : balance(balance), remainingDays(1) {
+    : balance(balance), remainingDays(1), reserveGoal(0.0), recentSpendingRate(0.0),
+      habits{} {
     setRemainingDays(remainingDays);
 }
 
@@ -28,18 +35,4 @@ void Budget::setRemainingDays(int days) {
 
 int Budget::getRemainingDays() const {
     return remainingDays;
-}
-
-double Budget::getDailyBudget() const {
-    if (remainingDays == 0) {
-        return balance.getBalance();
-    }
-    return floorToHundredths(balance.getBalance() / remainingDays);
-}
-
-double Budget::getWeeklyBudget() const {
-    if (remainingDays < DAYS_PER_WEEK) {
-        return balance.getBalance();
-    }
-    return floorToHundredths(balance.getBalance() * DAYS_PER_WEEK / remainingDays);
 }
