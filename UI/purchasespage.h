@@ -40,8 +40,13 @@ private:
     void useMenuItem(int index);
     void updateConfiguredPrice();
     void recordPurchase();
-    void removeSelectedPurchase();
+    void removeSelectedEntry();
+    void editSelectedEntry();
+    void refundSelectedPurchase();
+    void refundDialog(const LocalAccounts::Refund &refund);
     void refreshHistory();
+    void renderHistory();
+    const LocalAccounts::HistoryEntry *selectedEntry() const;
 
     const QString accountName;
     QDateEdit *date;
@@ -63,7 +68,15 @@ private:
     QLabel *historyStatus;
     QTableWidget *history;
     QPushButton *removePurchase;
-    QList<LocalAccounts::Purchase> purchases;
+    QPushButton *editEntry;
+    QPushButton *refundPurchase;
+    QCheckBox *filterDates;
+    QDateEdit *filterFrom;
+    QDateEdit *filterTo;
+    QComboBox *filterLocation;
+    QList<LocalAccounts::HistoryEntry> entries;
+    QList<LocalAccounts::HistoryEntry> visibleEntries;
+    bool historyLoaded = false;
     QNetworkAccessManager *network;
     QDate menuDate;
     QDateTime lastMenuRequest;

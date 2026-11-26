@@ -1,10 +1,14 @@
 #include "purchasespage.h"
+#include "historylocations.h"
+#include "quarter.h"
 
 #include <algorithm>
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDateEdit>
 #include <QDoubleSpinBox>
+#include <QDialog>
+#include <QDialogButtonBox>
 #include <QFont>
 #include <QFormLayout>
 #include <QGridLayout>
@@ -32,6 +36,44 @@ constexpr int MENU_RETRY_INTERVAL_SECONDS = 15 * 60;
 constexpr int MAX_MENU_BYTES = 8 * 1024 * 1024;
 constexpr int ITEM_INDEX_ROLE = Qt::UserRole + 1;
 
+using Kind = LocalAccounts::HistoryEntry::Kind;
+using LocalAccounts::Result;
+
+void configurePurchaseDate(QDateEdit *edit) {
+    const auto today = QDate::currentDate();
+    const auto quarter = Quarter::statusOn(today);
+    edit->setCalendarPopup(true);
+    edit->setMaximumDate(today);
+    if (quarter.phase == Quarter::Phase::InQuarter) {
+        edit->setMinimumDate(quarter.term.start);
+    }
+}
+
+QString transactionError(Result result) {
+    switch (result) {
+    case Result::InsufficientPoints:
+        return QObject::tr("This change would make your balance negative.");
+    case Result::RefundTooLarge:
+        return QObject::tr("Refunded points cannot exceed the purchase total.");
+    case Result::InvalidPurchase:
+        return QObject::tr("Enter a valid date, location and amount greater than zero.");
+    case Result::InvalidAmount:
+        return QObject::tr("Enter an amount greater than zero.");
+    default:
+        return QObject::tr("Could not save the change. Refresh the history and try again.");
+    }
+}
+
+void showDialogError(QDialog &dialog, QFormLayout &fields, QLabel &error, Result result) {
+    error.setText(transactionError(result));
+    // The label spans the form. Reserve the wrapped height before relaying out the visible dialog.
+    error.setMinimumHeight(error.heightForWidth(fields.contentsRect().width()));
+    error.show();
+    fields.invalidate();
+    fields.activate();
+    dialog.resize(dialog.size().expandedTo(fields.totalMinimumSize()));
+}
+
 QDateTime campusNow() {
     static const QTimeZone campusZone("America/Los_Angeles");
     return QDateTime::currentDateTimeUtc().toTimeZone(campusZone);
@@ -52,6 +94,12 @@ PurchasesPage::PurchasesPage(const QString &accountName, QWidget *parent)
       hoursLabel(new QLabel(this)), menuStatus(new QLabel(this)), feedback(new QLabel(this)),
       historyStatus(new QLabel(this)), history(new QTableWidget(0, 4, this)),
       removePurchase(new QPushButton(tr("Remove selected purchase"), this)),
+      editEntry(new QPushButton(tr("Edit selected"), this)),
+      refundPurchase(new QPushButton(tr("Refund selected purchase"), this)),
+      filterDates(new QCheckBox(tr("Filter by date"), this)),
+      filterFrom(new QDateEdit(QDate::currentDate().addDays(-7), this)),
+      filterTo(new QDateEdit(QDate::currentDate(), this)),
+      filterLocation(new QComboBox(this)),
       network(new QNetworkAccessManager(this)) {
     QFont balanceFont = balanceLabel->font();
     balanceFont.setPointSize(14);
@@ -60,8 +108,7 @@ PurchasesPage::PurchasesPage(const QString &accountName, QWidget *parent)
     balanceLabel->setObjectName("purchaseBalance");
 
     date->setObjectName("purchaseDate");
-    date->setCalendarPopup(true);
-    date->setMaximumDate(QDate::currentDate());
+    configurePurchaseDate(date);
     location->setObjectName("purchaseLocation");
     location->setEditable(true);
     location->setInsertPolicy(QComboBox::NoInsert);
@@ -122,7 +169,7 @@ PurchasesPage::PurchasesPage(const QString &accountName, QWidget *parent)
 
     auto *historyGroup = new QGroupBox(tr("Purchase history"), this);
     history->setObjectName("purchaseHistory");
-    history->setHorizontalHeaderLabels({tr("Date"), tr("Location"), tr("Item"), tr("Points spent")});
+    history->setHorizontalHeaderLabels({tr("Date"), tr("Location"), tr("Item"), tr("Balance change")});
     history->horizontalHeader()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
     history->horizontalHeader()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
     history->horizontalHeader()->setSectionResizeMode(2, QHeaderView::Stretch);
@@ -134,9 +181,43 @@ PurchasesPage::PurchasesPage(const QString &accountName, QWidget *parent)
     removePurchase->setEnabled(false);
     removePurchase->setObjectName("removePurchaseButton");
     auto *historyLayout = new QVBoxLayout(historyGroup);
+    filterDates->setObjectName("historyDateFilter");
+    filterFrom->setObjectName("historyFrom");
+    filterTo->setObjectName("historyTo");
+    filterLocation->setObjectName("historyLocation");
+    filterFrom->setCalendarPopup(true);
+    filterTo->setCalendarPopup(true);
+    filterFrom->setEnabled(false);
+    filterTo->setEnabled(false);
+    auto *filters = new QFormLayout;
+    auto *dateRange = new QHBoxLayout;
+    dateRange->addWidget(filterDates);
+    dateRange->addWidget(filterFrom);
+    dateRange->addWidget(new QLabel(tr("through"), this));
+    dateRange->addWidget(filterTo);
+    filters->addRow(dateRange);
+    auto *locationFilter = new QHBoxLayout;
+    locationFilter->addWidget(filterLocation, 1);
+    auto *clear = new QPushButton(tr("Clear filters"), this);
+    clear->setObjectName("clearHistoryFilters");
+    locationFilter->addWidget(clear);
+    filters->addRow(tr("Location"), locationFilter);
+    historyLayout->addLayout(filters);
+    historyStatus->setObjectName("historyStatus");
     historyLayout->addWidget(historyStatus);
     historyLayout->addWidget(history);
-    historyLayout->addWidget(removePurchase, 0, Qt::AlignRight);
+    editEntry->setObjectName("editHistoryButton");
+    refundPurchase->setObjectName("linkedRefundButton");
+    editEntry->setEnabled(false);
+    refundPurchase->setEnabled(false);
+    auto *refund = new QPushButton(tr("Log standalone refund"), this);
+    refund->setObjectName("standaloneRefundButton");
+    auto *actions = new QGridLayout;
+    actions->addWidget(editEntry, 0, 0);
+    actions->addWidget(removePurchase, 0, 1);
+    actions->addWidget(refundPurchase, 1, 0);
+    actions->addWidget(refund, 1, 1);
+    historyLayout->addLayout(actions);
 
     auto *layout = new QVBoxLayout(this);
     layout->addWidget(balanceLabel);
@@ -152,9 +233,30 @@ PurchasesPage::PurchasesPage(const QString &accountName, QWidget *parent)
     connect(reload, &QPushButton::clicked, this, [this] { refreshHours(true); });
     connect(save, &QPushButton::clicked, this, &PurchasesPage::recordPurchase);
     connect(history, &QTableWidget::itemSelectionChanged, this, [this] {
-        removePurchase->setEnabled(!history->selectedItems().isEmpty());
+        const auto *entry = selectedEntry();
+        const bool editable = entry && entry->kind != Kind::Correction;
+        editEntry->setEnabled(editable);
+        removePurchase->setEnabled(editable);
+        removePurchase->setText(entry && entry->kind == Kind::Refund
+            ? tr("Remove selected refund") : tr("Remove selected purchase"));
+        refundPurchase->setEnabled(entry && entry->kind == Kind::Purchase);
     });
-    connect(removePurchase, &QPushButton::clicked, this, &PurchasesPage::removeSelectedPurchase);
+    connect(removePurchase, &QPushButton::clicked, this, &PurchasesPage::removeSelectedEntry);
+    connect(editEntry, &QPushButton::clicked, this, &PurchasesPage::editSelectedEntry);
+    connect(refundPurchase, &QPushButton::clicked, this, &PurchasesPage::refundSelectedPurchase);
+    connect(refund, &QPushButton::clicked, this, [this] {
+        refundDialog({QDate::currentDate(), 0.01});
+    });
+    connect(filterDates, &QCheckBox::toggled, filterFrom, &QDateEdit::setEnabled);
+    connect(filterDates, &QCheckBox::toggled, filterTo, &QDateEdit::setEnabled);
+    connect(filterDates, &QCheckBox::toggled, this, &PurchasesPage::renderHistory);
+    connect(filterFrom, &QDateEdit::dateChanged, this, &PurchasesPage::renderHistory);
+    connect(filterTo, &QDateEdit::dateChanged, this, &PurchasesPage::renderHistory);
+    connect(filterLocation, &QComboBox::currentIndexChanged, this, &PurchasesPage::renderHistory);
+    connect(clear, &QPushButton::clicked, this, [this] {
+        filterDates->setChecked(false);
+        filterLocation->setCurrentIndex(0);
+    });
     updateMenuItems();
     refreshHistory();
     location->setFocus();
@@ -166,6 +268,7 @@ PurchasesPage::PurchasesPage(const QString &accountName, QWidget *parent)
 
 void PurchasesPage::showBalance(double balance) {
     balanceLabel->setText(tr("Balance: %1 points").arg(locale().toString(balance, 'f', 2)));
+    refreshHistory();
 }
 
 void PurchasesPage::updateMenuItems() {
@@ -393,8 +496,8 @@ void PurchasesPage::recordPurchase() {
     using LocalAccounts::Result;
     switch (LocalAccounts::recordPurchase(accountName, purchase, newBalance)) {
     case Result::Success:
+        showBalance(newBalance);
         emit balanceUpdated(newBalance);
-        refreshHistory();
         menuItem->setCurrentIndex(0);
         item->clear();
         points->setValue(0.0);
@@ -412,54 +515,239 @@ void PurchasesPage::recordPurchase() {
     }
 }
 
-void PurchasesPage::removeSelectedPurchase() {
-    const auto selected = history->selectedItems();
-    if (selected.isEmpty()) {
+const LocalAccounts::HistoryEntry *PurchasesPage::selectedEntry() const {
+    const auto selection = history->selectionModel()->selectedRows();
+    if (selection.isEmpty() || selection.first().row() >= visibleEntries.size()) {
+        return nullptr;
+    }
+    return &visibleEntries.at(selection.first().row());
+}
+
+void PurchasesPage::removeSelectedEntry() {
+    const auto *selected = selectedEntry();
+    if (!selected || selected->kind == Kind::Correction) {
         return;
     }
-    const auto purchase = purchases.at(selected.first()->row());
+    const auto entry = *selected;
+    const bool refund = entry.kind == Kind::Refund;
     const auto answer = QMessageBox::question(
-        this, tr("Remove purchase?"),
-        tr("Remove this purchase and return %1 points to your balance?")
-            .arg(locale().toString(purchase.points, 'f', 2)),
+        this, tr("Remove history entry?"),
+        refund ? tr("Remove this refund and deduct its points from your balance?")
+               : tr("Remove this purchase and its linked refunds? Only points still unrefunded are returned."),
         QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel);
     if (answer != QMessageBox::Yes) {
         return;
     }
 
     double newBalance = 0.0;
-    using LocalAccounts::Result;
-    const Result result = LocalAccounts::removePurchase(accountName, purchase, newBalance);
+    const auto result = refund
+        ? LocalAccounts::removeRefund(accountName, entry.id, newBalance)
+        : LocalAccounts::removePurchase(accountName,
+            {entry.date, entry.location, entry.item, -entry.balanceChange, entry.id}, newBalance);
     if (result == Result::Success) {
+        showBalance(newBalance);
         emit balanceUpdated(newBalance);
-        refreshHistory();
-        feedback->setText(tr("Purchase removed. Points returned."));
-    } else if (result == Result::PurchaseUnavailable) {
-        refreshHistory();
-        feedback->setText(tr("That purchase has already been removed."));
+        feedback->setText(refund ? tr("Refund removed.") : tr("Purchase removed."));
     } else {
-        feedback->setText(tr("Could not remove the purchase. Try again."));
+        feedback->setText(transactionError(result));
+        refreshHistory();
+    }
+}
+
+void PurchasesPage::editSelectedEntry() {
+    const auto *selected = selectedEntry();
+    if (!selected || selected->kind == Kind::Correction) {
+        return;
+    }
+    const auto entry = *selected;
+    if (entry.kind == Kind::Refund) {
+        refundDialog({entry.date, entry.balanceChange, entry.purchaseId, entry.item, entry.id});
+        return;
+    }
+
+    QDialog dialog(this);
+    dialog.setWindowTitle(tr("Edit purchase"));
+    QFormLayout fields(&dialog);
+    QDateEdit when(entry.date, &dialog);
+    when.setObjectName("editPurchaseDate");
+    configurePurchaseDate(&when);
+    QLineEdit venue(entry.location, &dialog);
+    venue.setObjectName("editPurchaseLocation");
+    venue.setMaxLength(LocalAccounts::PurchaseTextLimit);
+    QLineEdit name(entry.item, &dialog);
+    name.setObjectName("editPurchaseItem");
+    name.setMaxLength(LocalAccounts::PurchaseTextLimit);
+    QDoubleSpinBox amount(&dialog);
+    amount.setObjectName("editPurchasePoints");
+    amount.setRange(0.01, LocalAccounts::MaxPurchasePoints);
+    amount.setValue(-entry.balanceChange);
+    QLabel error(&dialog);
+    error.setObjectName("editPurchaseError");
+    error.setTextFormat(Qt::PlainText);
+    error.setWordWrap(true);
+    error.hide();
+    QDialogButtonBox buttons(QDialogButtonBox::Save | QDialogButtonBox::Cancel, &dialog);
+    fields.addRow(tr("Date"), &when);
+    fields.addRow(tr("Location"), &venue);
+    fields.addRow(tr("Item"), &name);
+    fields.addRow(tr("Points spent"), &amount);
+    fields.addRow(&error);
+    fields.addRow(&buttons);
+    connect(&buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    double newBalance = 0.0;
+    connect(&buttons, &QDialogButtonBox::accepted, &dialog, [&] {
+        const auto result = LocalAccounts::editPurchase(accountName,
+            {when.date(), venue.text(), name.text(), amount.value(), entry.id}, newBalance);
+        if (result == Result::Success) {
+            dialog.accept();
+        } else {
+            showDialogError(dialog, fields, error, result);
+        }
+    });
+    if (dialog.exec() == QDialog::Accepted) {
+        showBalance(newBalance);
+        emit balanceUpdated(newBalance);
+        feedback->setText(tr("Purchase updated."));
+    }
+}
+
+void PurchasesPage::refundSelectedPurchase() {
+    const auto *entry = selectedEntry();
+    if (!entry || entry->kind != Kind::Purchase) {
+        return;
+    }
+    double available = -entry->balanceChange;
+    for (const auto &row : entries) {
+        if (row.purchaseId == entry->id) {
+            available -= row.balanceChange;
+        }
+    }
+    if (available < 0.005) {
+        feedback->setText(tr("This purchase has already been fully refunded."));
+        return;
+    }
+    refundDialog({QDate::currentDate(), available, entry->id});
+}
+
+void PurchasesPage::refundDialog(const LocalAccounts::Refund &refund) {
+    QDialog dialog(this);
+    dialog.setWindowTitle(refund.id.isEmpty() ? tr("Log refund") : tr("Edit refund"));
+    QFormLayout fields(&dialog);
+    QDateEdit when(refund.date, &dialog);
+    when.setObjectName("refundDate");
+    when.setCalendarPopup(true);
+    when.setMaximumDate(QDate::currentDate());
+    QDoubleSpinBox amount(&dialog);
+    amount.setObjectName("refundPoints");
+    amount.setRange(0.01, LocalAccounts::MaxPurchasePoints);
+    amount.setValue(refund.points);
+    QLineEdit note(refund.note, &dialog);
+    note.setObjectName("refundNote");
+    note.setMaxLength(LocalAccounts::PurchaseTextLimit);
+    QLabel error(&dialog);
+    error.setObjectName("refundError");
+    error.setTextFormat(Qt::PlainText);
+    error.setWordWrap(true);
+    error.hide();
+    QDialogButtonBox buttons(QDialogButtonBox::Save | QDialogButtonBox::Cancel, &dialog);
+    fields.addRow(tr("Date"), &when);
+    fields.addRow(tr("Points returned"), &amount);
+    fields.addRow(tr("Note"), &note);
+    fields.addRow(&error);
+    fields.addRow(&buttons);
+    connect(&buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    double newBalance = 0.0;
+    connect(&buttons, &QDialogButtonBox::accepted, &dialog, [&] {
+        const LocalAccounts::Refund updated{
+            when.date(), amount.value(), refund.purchaseId, note.text(), refund.id};
+        const auto result = refund.id.isEmpty()
+            ? LocalAccounts::recordRefund(accountName, updated, newBalance)
+            : LocalAccounts::editRefund(accountName, updated, newBalance);
+        if (result == Result::Success) {
+            dialog.accept();
+        } else {
+            showDialogError(dialog, fields, error, result);
+        }
+    });
+    if (dialog.exec() == QDialog::Accepted) {
+        showBalance(newBalance);
+        emit balanceUpdated(newBalance);
+        feedback->setText(refund.id.isEmpty() ? tr("Refund logged.") : tr("Refund updated."));
     }
 }
 
 void PurchasesPage::refreshHistory() {
-    const bool loaded = LocalAccounts::loadPurchases(accountName, purchases);
+    historyLoaded = LocalAccounts::loadHistory(accountName, entries);
+    resolveRefundLocations(entries);
+    const QString chosen = filterLocation->currentData().toString();
+    const QSignalBlocker blocker(filterLocation);
+    filterLocation->clear();
+    filterLocation->addItem(tr("All locations"), QString());
+    QSet<QString> locations;
+    for (const auto &entry : entries) {
+        if (!entry.location.isEmpty()) {
+            locations.insert(entry.location);
+        }
+    }
+    auto sorted = locations.values();
+    sorted.sort(Qt::CaseInsensitive);
+    for (const auto &venue : sorted) {
+        filterLocation->addItem(venue, venue);
+    }
+    if (!chosen.isEmpty() && filterLocation->findData(chosen) < 0) {
+        filterLocation->addItem(chosen, chosen);
+    }
+    filterLocation->setCurrentIndex(std::max(0, filterLocation->findData(chosen)));
+    renderHistory();
+}
+
+void PurchasesPage::renderHistory() {
     history->clearSelection();
-    history->setRowCount(purchases.size());
-    int row = 0;
-    for (const auto &purchase : purchases) {
-        history->setItem(row, 0, new QTableWidgetItem(locale().toString(purchase.date, QLocale::ShortFormat)));
-        history->setItem(row, 1, new QTableWidgetItem(purchase.location));
-        history->setItem(row, 2, new QTableWidgetItem(purchase.item));
-        auto *cost = new QTableWidgetItem(locale().toString(purchase.points, 'f', 2));
-        cost->setTextAlignment(Qt::AlignRight | Qt::AlignVCenter);
-        history->setItem(row, 3, cost);
-        ++row;
+    visibleEntries.clear();
+    const auto venue = filterLocation->currentData().toString();
+    const bool dateRange = filterDates->isChecked();
+    const bool reversed = dateRange && filterFrom->date() > filterTo->date();
+    for (const auto &entry : entries) {
+        if ((!venue.isEmpty() && entry.location != venue)
+            || (dateRange && (entry.date < filterFrom->date() || entry.date > filterTo->date()))) {
+            continue;
+        }
+        visibleEntries.append(entry);
     }
-    if (!loaded) {
+    history->setRowCount(visibleEntries.size());
+    for (int row = 0; row < visibleEntries.size(); ++row) {
+        const auto &entry = visibleEntries.at(row);
+        QString description = entry.item;
+        if (entry.kind == Kind::Correction) {
+            description = tr("Balance correction");
+        } else if (entry.kind == Kind::Refund) {
+            description = entry.item.isEmpty() ? tr("Refund") : tr("Refund — %1").arg(entry.item);
+        }
+        const QString change = (entry.balanceChange > 0 ? QStringLiteral("+") : QString())
+            + locale().toString(entry.balanceChange, 'f', 2);
+        const QString values[] = {
+            locale().toString(entry.date, QLocale::ShortFormat), entry.location, description, change};
+        for (int column = 0; column < 4; ++column) {
+            auto *cell = new QTableWidgetItem(values[column]);
+            if (entry.kind == Kind::Correction) {
+                auto font = cell->font();
+                font.setItalic(true);
+                cell->setFont(font);
+            }
+            if (column == 3) {
+                cell->setTextAlignment(Qt::AlignRight | Qt::AlignVCenter);
+            }
+            history->setItem(row, column, cell);
+        }
+    }
+    historyStatus->setVisible(!historyLoaded || visibleEntries.isEmpty());
+    if (!historyLoaded) {
         historyStatus->setText(tr("Could not load purchase history."));
-    } else if (purchases.isEmpty()) {
-        historyStatus->setText(tr("No purchases logged yet."));
+    } else if (reversed) {
+        historyStatus->setText(tr("Choose a start date on or before the end date."));
+    } else if (dateRange || !venue.isEmpty()) {
+        historyStatus->setText(tr("No history matches these filters."));
+    } else {
+        historyStatus->setText(tr("No purchases, refunds or balance corrections yet."));
     }
-    historyStatus->setVisible(!loaded || purchases.isEmpty());
 }

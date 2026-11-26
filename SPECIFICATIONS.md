@@ -213,3 +213,28 @@ Fri,1
 have 10 campus days and 20 meals; with 400 spendable points that is 20 per meal and
 40 per campus day. 3 days starting on a Saturday have 1 campus day. Habits of all 0,
 or a meal count of 11, give no suggestions or are rejected.
+
+## SP-09: Purchase history and refunds
+
+- History shows purchases, refunds, and balance corrections. Date filters are inclusive.
+  A linked refund follows the current location of its original purchase. Standalone
+  refunds and balance corrections appear when the location filter is set to All locations.
+- During a quarter listed in the calendar, purchase date controls allow dates from the
+  first day of classes through today. Outside a listed quarter they allow dates through
+  today.
+- Removing a purchase also removes all its linked refunds. The balance increases by
+  the unrefunded part of the purchase. Removing a refund on its own deducts the points it
+  returned. Any edit or removal that would make the balance negative is rejected.
+
+## SP-10: Spending and budget comparison
+
+- Location totals and the daily and weekly charts use transactions dated within the
+  selected range. Purchases add to spending, refunds reduce spending on the refund date,
+  and balance corrections that lower the balance count as **Unlogged**. Standalone
+  refunds reduce spending under **Standalone refunds**. Corrections that increase the
+  balance are excluded.
+- Past periods are compared with the current Plan budget, calculated from the saved
+  balance, reserve, and days remaining. Historical budget snapshots are not stored.
+  Weeks run Monday through Sunday. For a partial week at either end of the selected
+  range, the weekly budget is multiplied by the fraction of days included and rounded
+  down to the nearest hundredth.
