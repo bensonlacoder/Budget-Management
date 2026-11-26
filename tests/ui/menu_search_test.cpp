@@ -8,9 +8,12 @@
 #include <QComboBox>
 #include <QDoubleSpinBox>
 #include <QLabel>
+#include <QApplication>
 #include <QListWidget>
+#include <QMessageBox>
 #include <QPushButton>
 #include <QTableWidget>
+#include <QTimer>
 
 namespace {
 // A small catalog with known prices, in hundredths of a point.
@@ -25,6 +28,26 @@ QList<ScuMenu::Location> sampleCatalog() {
                    {"Combo", 900, "Side", {{"Fries", 900}, {"Onion rings", ReceiptPrice}}}}},
         {"Closed station", {}},
     };
+}
+
+// Clicks the button labeled `choice` on the next confirmation box, once it opens, and
+// records the box's question in `question`.
+void answerConfirmation(const QString &choice, QString &question) {
+    auto *timer = new QTimer;
+    QObject::connect(timer, &QTimer::timeout, timer, [timer, choice, &question] {
+        auto *box = qobject_cast<QMessageBox *>(QApplication::activeModalWidget());
+        if (!box) {
+            return; // Not open yet.
+        }
+        question = box->text();
+        for (QAbstractButton *button : box->buttons()) {
+            if (button->text().remove('&') == choice) {
+                button->click();
+            }
+        }
+        timer->deleteLater();
+    });
+    timer->start(10);
 }
 
 QStringList names(const QList<MenuSearch::Match> &found) {
@@ -98,7 +121,8 @@ TEST_CASE("The Find meals dialog lists the real catalog within the limit") {
     CHECK(status->text().startsWith("No meals cost 0.00 points or less."));
 }
 
-TEST_CASE("Menu sections are saved from a result, shown again, and removed") {
+// Author: Nathan Gu
+TEST_CASE("Menu sections are saved from a result, shown again, and removed after confirming") {
     TestAccountStore store;
     const auto account = store.createVerified("sections@scu.edu", "Planner").accountId;
     {
@@ -139,8 +163,20 @@ TEST_CASE("Menu sections are saved from a result, shown again, and removed") {
     show->click();
     CHECK(location->currentData().toString() == section);
 
+    // Removing asks first; Cancel keeps the section.
+    auto *feedback = dialog.findChild<QLabel *>("sectionFeedback");
+    QString question;
+    answerConfirmation("Cancel", question);
+    remove->click();
+    CHECK(question == "Remove " + section + " from your saved sections? You can save it again later.");
+    CHECK(saved->count() == 1);
+    CHECK(feedback->text() == section + " is still saved.");
+
+    saved->item(0)->setSelected(true);
+    answerConfirmation("Remove", question);
     remove->click();
     CHECK(saved->count() == 0);
+    CHECK(feedback->text() == "Removed " + section + ".");
     QStringList stored;
     REQUIRE(LocalAccounts::loadSavedSections(account, stored));
     CHECK(stored.isEmpty());
