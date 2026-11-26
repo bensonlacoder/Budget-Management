@@ -99,7 +99,11 @@ PlanPage::PlanPage(const QString &accountName, QWidget *parent)
     auto *reserveRow = new QHBoxLayout;
     reserveRow->addWidget(reserveEdit, 1);
     reserveRow->addWidget(saveButton);
-    reserveForm->addRow(tr("&Keep in reserve:"), reserveRow);
+    // A row whose field is a layout gets no buddy from addRow, so the label shows a
+    // literal "&" unless it is given one.
+    auto *reserveLabel = new QLabel(tr("&Keep in reserve:"), reserveBox);
+    reserveLabel->setBuddy(reserveEdit);
+    reserveForm->addRow(reserveLabel, reserveRow);
     reserveMessage = namedLabel("reserveMessage", reserveBox);
     reserveForm->addRow(QString(), reserveMessage);
     layout->addWidget(reserveBox);
@@ -113,9 +117,9 @@ PlanPage::PlanPage(const QString &accountName, QWidget *parent)
         habitsBox);
     habitsHelp->setWordWrap(true);
     habitsForm->addRow(habitsHelp);
-    const QStringList dayNames = {tr("&Monday:"), tr("&Tuesday:"), tr("&Wednesday:"),
+    const QStringList dayNames = {tr("Mo&nday:"), tr("T&uesday:"), tr("&Wednesday:"),
                                   tr("T&hursday:"), tr("&Friday:"), tr("&Saturday:"),
-                                  tr("S&unday:")};
+                                  tr("Sunda&y:")};
     static const char *const editNames[] = {"mealsMonday", "mealsTuesday", "mealsWednesday",
                                             "mealsThursday", "mealsFriday", "mealsSaturday",
                                             "mealsSunday"};
@@ -128,7 +132,7 @@ PlanPage::PlanPage(const QString &accountName, QWidget *parent)
         habitsForm->addRow(dayNames.at(day), edit);
         connect(edit, &QSpinBox::valueChanged, this, &PlanPage::habitsEdited);
     }
-    auto *uploadButton = new QPushButton(tr("&Upload CSV..."), habitsBox);
+    auto *uploadButton = new QPushButton(tr("Upload CS&V..."), habitsBox);
     uploadButton->setObjectName("uploadHabitsButton");
     uploadButton->setToolTip(tr("A file with one line per day, like \"Monday,2\"."));
     habitsForm->addRow(QString(), uploadButton);

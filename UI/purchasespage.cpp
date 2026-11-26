@@ -147,13 +147,13 @@ PurchasesPage::PurchasesPage(const QString &accountName, QWidget *parent)
     auto *entry = new QGroupBox(tr("Log a purchase"), this);
     entry->setLayout(form);
     form->addRow(tr("&Date"), date);
-    form->addRow(tr("&Location"), location);
+    form->addRow(tr("L&ocation"), location);
     form->addRow(QString(), hoursLabel);
-    form->addRow(tr("SCU &menu item"), menuItem);
+    form->addRow(tr("SCU menu i&tem"), menuItem);
     form->addRow(choiceLabel, choice);
     form->addRow(tr("Add-ons"), extras);
     form->addRow(tr("&Item name"), item);
-    form->addRow(tr("&Points spent"), points);
+    form->addRow(tr("Points &spent"), points);
     auto *source = new QLabel(tr(
         "<a href=\"https://scudining.cafebonappetit.com/\">SCU menus and hours</a>"), entry);
     source->setObjectName("scuMenusAndHoursLink");
@@ -167,7 +167,7 @@ PurchasesPage::PurchasesPage(const QString &accountName, QWidget *parent)
     sources->addWidget(reload);
     form->addRow(menuStatus);
     form->addRow(sources);
-    auto *save = new QPushButton(tr("&Log purchase"), entry);
+    auto *save = new QPushButton(tr("Lo&g purchase"), entry);
     save->setObjectName("logPurchaseButton");
     save->setAutoDefault(false);
     form->addRow(save);
