@@ -39,13 +39,17 @@ constexpr int ITEM_INDEX_ROLE = Qt::UserRole + 1;
 using Kind = LocalAccounts::HistoryEntry::Kind;
 using LocalAccounts::Result;
 
-void configurePurchaseDate(QDateEdit *edit) {
+// New purchases are limited to the current quarter. `existing` is the saved date of a
+// purchase being edited: an older one stays allowed, so opening and saving the edit
+// doesn't silently move it into this quarter.
+void configurePurchaseDate(QDateEdit *edit, const QDate &existing = {}) {
     const auto today = QDate::currentDate();
     const auto quarter = Quarter::statusOn(today);
     edit->setCalendarPopup(true);
     edit->setMaximumDate(today);
     if (quarter.phase == Quarter::Phase::InQuarter) {
-        edit->setMinimumDate(quarter.term.start);
+        edit->setMinimumDate(existing.isValid() ? std::min(existing, quarter.term.start)
+                                                : quarter.term.start);
     }
 }
 
@@ -55,6 +59,8 @@ QString transactionError(Result result) {
         return QObject::tr("This change would make your balance negative.");
     case Result::RefundTooLarge:
         return QObject::tr("Refunded points cannot exceed the purchase total.");
+    case Result::RefundBeforePurchase:
+        return QObject::tr("A refund can't be dated before its purchase.");
     case Result::InvalidPurchase:
         return QObject::tr("Enter a valid date, location and amount greater than zero.");
     case Result::InvalidAmount:
@@ -570,7 +576,7 @@ void PurchasesPage::editSelectedEntry() {
     QFormLayout fields(&dialog);
     QDateEdit when(entry.date, &dialog);
     when.setObjectName("editPurchaseDate");
-    configurePurchaseDate(&when);
+    configurePurchaseDate(&when, entry.date);
     QLineEdit venue(entry.location, &dialog);
     venue.setObjectName("editPurchaseLocation");
     venue.setMaxLength(LocalAccounts::PurchaseTextLimit);
@@ -637,6 +643,12 @@ void PurchasesPage::refundDialog(const LocalAccounts::Refund &refund) {
     when.setObjectName("refundDate");
     when.setCalendarPopup(true);
     when.setMaximumDate(QDate::currentDate());
+    // A linked refund can't come before its purchase.
+    for (const auto &row : std::as_const(entries)) {
+        if (row.kind == Kind::Purchase && row.id == refund.purchaseId) {
+            when.setMinimumDate(row.date);
+        }
+    }
     QDoubleSpinBox amount(&dialog);
     amount.setObjectName("refundPoints");
     amount.setRange(0.01, LocalAccounts::MaxPurchasePoints);

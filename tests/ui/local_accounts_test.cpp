@@ -368,6 +368,50 @@ TEST_CASE("Purchases can be edited, adjusting the balance by the difference") {
     CHECK(balanceOf(buyer) == 323.5);
 }
 
+// Author: Nathan Gu
+TEST_CASE("A linked refund can't be dated before its purchase") {
+    TestAccountStore store;
+    const auto buyer = createAccount("early-refund@scu.edu", "Early", "apartment").accountId;
+    const QDate today = QDate::currentDate();
+    const QDate bought = today.addDays(-3);
+    double balance = 0.0;
+    REQUIRE(LocalAccounts::recordPurchase(buyer, {bought, "Marketplace", "Pasta", 20.0}, balance)
+            == Result::Success);
+    QList<LocalAccounts::Purchase> purchases;
+    REQUIRE(LocalAccounts::loadPurchases(buyer, purchases));
+    const QString pasta = purchases.first().id;
+    const double afterPurchase = balanceOf(buyer);
+
+    CHECK(LocalAccounts::recordRefund(buyer, {bought.addDays(-1), 5.0, pasta}, balance)
+          == Result::RefundBeforePurchase);
+    CHECK(balanceOf(buyer) == afterPurchase);
+    // A standalone refund has no purchase to come after.
+    CHECK(LocalAccounts::recordRefund(buyer, {bought.addDays(-1), 1.0}, balance)
+          == Result::Success);
+    // The same day as the purchase is fine.
+    REQUIRE(LocalAccounts::recordRefund(buyer, {bought, 5.0, pasta}, balance) == Result::Success);
+
+    QList<LocalAccounts::HistoryEntry> history;
+    REQUIRE(LocalAccounts::loadHistory(buyer, history));
+    QString refundId;
+    for (const auto &entry : history) {
+        if (entry.kind == HistoryEntry::Kind::Refund && entry.purchaseId == pasta) {
+            refundId = entry.id;
+        }
+    }
+    REQUIRE_FALSE(refundId.isEmpty());
+    CHECK(LocalAccounts::editRefund(buyer, {bought.addDays(-2), 5.0, pasta, {}, refundId}, balance)
+          == Result::RefundBeforePurchase);
+
+    // Moving the purchase after its refund is refused too; its own day still works.
+    CHECK(LocalAccounts::editPurchase(buyer, {today, "Marketplace", "Pasta", 20.0, pasta}, balance)
+          == Result::RefundBeforePurchase);
+    CHECK(LocalAccounts::editPurchase(buyer, {bought, "Marketplace", "Pasta", 25.0, pasta}, balance)
+          == Result::Success);
+    REQUIRE(LocalAccounts::loadPurchases(buyer, purchases));
+    CHECK(purchases.first().date == bought);
+}
+
 TEST_CASE("Refunds return points, respect the purchase total and can be edited or removed") {
     TestAccountStore store;
     const auto buyer = createAccount("refund@scu.edu", "Refunder", "apartment").accountId; // 336

@@ -1,5 +1,6 @@
 #include "doctest.h"
 #include "purchasespage.h"
+#include "quarter.h"
 #include "test_account_store.h"
 
 #include <QApplication>
@@ -156,4 +157,56 @@ TEST_CASE("Linked refunds respect the remaining amount and can be edited and rem
     page.findChild<QPushButton *>("removePurchaseButton")->click();
     CHECK(table->rowCount() == 2);
     CHECK(balance == profile.balance - 6);
+}
+
+// Author: Nathan Gu
+TEST_CASE("Editing a purchase from an earlier quarter keeps its date") {
+    TestAccountStore store;
+    const auto profile = store.createVerified("old-purchase@example.com", "Student");
+    const auto today = QDate::currentDate();
+    const auto quarter = Quarter::statusOn(today);
+    // Before this quarter's first day when there is one; otherwise just an older date.
+    const QDate old = quarter.phase == Quarter::Phase::InQuarter ? quarter.term.start.addDays(-1)
+                                                                 : today.addDays(-30);
+    double balance;
+    REQUIRE(LocalAccounts::recordPurchase(profile.accountId, {old, "A", "Tea", 3}, balance)
+            == Result::Success);
+    PurchasesPage page(profile.accountId);
+    auto *table = page.findChild<QTableWidget *>("purchaseHistory");
+    table->selectRow(0);
+    QDate shown;
+    QTimer::singleShot(0, &page, [&] {
+        auto *dialog = QApplication::activeModalWidget();
+        shown = dialog->findChild<QDateEdit *>("editPurchaseDate")->date();
+        dialog->findChild<QLineEdit *>("editPurchaseItem")->setText("Green tea");
+        submitAmount("editPurchasePoints", 3);
+    });
+    page.findChild<QPushButton *>("editHistoryButton")->click();
+    CHECK(shown == old);
+    QList<LocalAccounts::Purchase> purchases;
+    REQUIRE(LocalAccounts::loadPurchases(profile.accountId, purchases));
+    REQUIRE(purchases.size() == 1);
+    CHECK(purchases.first().item == "Green tea");
+    CHECK(purchases.first().date == old);
+}
+
+// Author: Nathan Gu
+TEST_CASE("A linked refund's date can't be set before its purchase") {
+    TestAccountStore store;
+    const auto profile = store.createVerified("refund-date@example.com", "Student");
+    const QDate bought = QDate::currentDate().addDays(-2);
+    double balance;
+    REQUIRE(LocalAccounts::recordPurchase(profile.accountId, {bought, "A", "Tea", 3}, balance)
+            == Result::Success);
+    PurchasesPage page(profile.accountId);
+    page.findChild<QTableWidget *>("purchaseHistory")->selectRow(0);
+    QDate earliest;
+    QTimer::singleShot(0, &page, [&] {
+        auto *dialog = qobject_cast<QDialog *>(QApplication::activeModalWidget());
+        REQUIRE(dialog);
+        earliest = dialog->findChild<QDateEdit *>("refundDate")->minimumDate();
+        dialog->reject();
+    });
+    page.findChild<QPushButton *>("linkedRefundButton")->click();
+    CHECK(earliest == bought);
 }

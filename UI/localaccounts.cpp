@@ -435,9 +435,10 @@ bool purchaseTotals(QSqlDatabase &db, const QString &account, const QString &pur
     return true;
 }
 
-// Checks a refund's link: the purchase must exist and have enough left to refund.
+// Checks a refund's link: the purchase must exist, be dated on or before the refund,
+// and have enough left to refund.
 Result checkRefundLink(QSqlDatabase &db, const QString &account, const QString &purchaseId,
-                       qint64 cents, const QString &excludeRefund = {}) {
+                       qint64 cents, const QDate &date, const QString &excludeRefund = {}) {
     if (purchaseId.isEmpty()) {
         return Result::Success;
     }
@@ -445,6 +446,15 @@ Result checkRefundLink(QSqlDatabase &db, const QString &account, const QString &
     qint64 refunded = 0;
     if (!purchaseTotals(db, account, purchaseId, points, refunded, excludeRefund)) {
         return Result::PurchaseUnavailable;
+    }
+    QSqlQuery query(db);
+    if (!run(query, QStringLiteral("SELECT date FROM purchases WHERE id = ? AND account_id = ?"),
+             {purchaseId, account})
+        || !query.next()) {
+        return Result::StorageError;
+    }
+    if (date < QDate::fromString(query.value(0).toString(), Qt::ISODate)) {
+        return Result::RefundBeforePurchase;
     }
     return cents > points - refunded ? Result::RefundTooLarge : Result::Success;
 }
@@ -808,6 +818,17 @@ Result editPurchase(const QString &account, const Purchase &updatedPurchase, dou
         if (cents < refunded) {
             return Result::RefundTooLarge;
         }
+        QSqlQuery firstRefund(db);
+        if (!run(firstRefund, QStringLiteral("SELECT MIN(date) FROM refunds WHERE purchase_id = ?"),
+                 {updatedPurchase.id})
+            || !firstRefund.next()) {
+            return Result::StorageError;
+        }
+        if (!firstRefund.value(0).isNull()
+            && updatedPurchase.date
+                > QDate::fromString(firstRefund.value(0).toString(), Qt::ISODate)) {
+            return Result::RefundBeforePurchase;
+        }
         const Result changed = changeBalance(db, account, oldCents - cents, updated);
         if (changed != Result::Success) {
             return changed;
@@ -886,7 +907,7 @@ Result recordRefund(const QString &account, const Refund &refund, double &newBal
     const qint64 cents = toCents(refund.points);
     double updated = 0.0;
     const Result result = inTransaction([&](QSqlDatabase &db) {
-        const Result linked = checkRefundLink(db, account, refund.purchaseId, cents);
+        const Result linked = checkRefundLink(db, account, refund.purchaseId, cents, refund.date);
         if (linked != Result::Success) {
             return linked;
         }
@@ -930,7 +951,8 @@ Result editRefund(const QString &account, const Refund &updatedRefund, double &n
         }
         const qint64 oldCents = query.value(0).toLongLong();
         const Result linked =
-            checkRefundLink(db, account, updatedRefund.purchaseId, cents, updatedRefund.id);
+            checkRefundLink(db, account, updatedRefund.purchaseId, cents, updatedRefund.date,
+                            updatedRefund.id);
         if (linked != Result::Success) {
             return linked;
         }

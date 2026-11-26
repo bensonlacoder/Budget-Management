@@ -35,6 +35,7 @@ enum class Result {
     InvalidAmount,       // Not greater than 0 (or negative for Set), non-finite, or too large.
     InvalidSettings,     // Reserve goal, habits or saved section out of range.
     RefundTooLarge,      // More than the unrefunded part of the purchase.
+    RefundBeforePurchase, // A linked refund dated before its purchase.
     RefundUnavailable,
     FriendUnavailable,
     SectionUnavailable,
@@ -183,7 +184,8 @@ Result clearDaysCorrection(const QString &account);
 // ---- Purchases, refunds and history ----
 Result recordPurchase(const QString &account, const Purchase &purchase, double &newBalance);
 // Finds the purchase by updated.id and adjusts the balance by the difference. The new
-// points can't be less than what has already been refunded (RefundTooLarge).
+// points can't be less than what has already been refunded (RefundTooLarge), and the
+// new date can't be after one of its refunds (RefundBeforePurchase).
 Result editPurchase(const QString &account, const Purchase &updated, double &newBalance);
 // Finds the purchase by purchase.id. Its refunds are removed with it, and the balance
 // gets back the points that had not already been refunded.
