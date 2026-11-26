@@ -401,8 +401,8 @@ QString PurchasesPage::hoursText(const ScuMenu::Schedule &schedule, QTime now) c
 
     QStringList hours;
     for (const auto &window : schedule.hours) {
-        const QString range = tr("%1 to %2").arg(AppStyle::locale().toString(window.opens, QLocale::ShortFormat),
-                                                  AppStyle::locale().toString(window.closes, QLocale::ShortFormat));
+        const QString range = tr("%1 to %2").arg(AppStyle::time(window.opens),
+                                                  AppStyle::time(window.closes));
         if (!hours.contains(range)) {
             hours.append(range);
         }
