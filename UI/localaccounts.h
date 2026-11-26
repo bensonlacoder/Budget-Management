@@ -33,12 +33,11 @@ enum class Result {
     InsufficientPoints,  // The change would make the balance negative.
     PurchaseUnavailable,
     InvalidAmount,       // Not greater than 0 (or negative for Set), non-finite, or too large.
-    InvalidSettings,     // Reserve goal, habits or saved section out of range.
+    InvalidSettings,     // Reserve goal or habits out of range.
     RefundTooLarge,      // More than the unrefunded part of the purchase.
     RefundBeforePurchase, // A linked refund dated before its purchase.
     RefundUnavailable,
     FriendUnavailable,
-    SectionUnavailable,
     EmailNotVerified,    // Sign-in before the sign-up code was entered.
     InvalidCode,         // Wrong code, no code requested, or too many wrong tries.
     CodeExpired,         // Older than CodeLifetimeMinutes; request a new one.
@@ -216,12 +215,6 @@ Result sendRequest(const QString &account, const QString &friendId);
 Result respondToRequest(const QString &account, const QString &friendId, bool accept);
 // Ends the friendship for both accounts.
 Result removeFriend(const QString &account, const QString &friendId);
-
-// ---- Saved menu sections ----
-// For example "Marketplace / Grill". Saving one that is already saved succeeds.
-bool loadSavedSections(const QString &account, QStringList &sections);
-Result saveSection(const QString &account, const QString &section);
-Result removeSection(const QString &account, const QString &section);
 
 // ---- Email codes ----
 // Codes are 6 digits, sent with EmailSender, and stored only as a salted hash.

@@ -74,14 +74,14 @@ Create an account with your email address, a display name (up to 32 characters),
 quarter dining plan and a password of at least 8 characters. The app emails you a
 6-digit code; enter it to finish creating the account. Then sign in with your email
 and password; upper and lower case in the email don't matter. Your balance starts at
-the plan's points. Use **Account > Sign out** to switch accounts.
+the plan's points. Use **Sign out** on the Profile tab to switch accounts.
 
 - **Resend code** sends a new code and cancels the old one. Codes expire after 15
   minutes, and 5 wrong tries cancel a code.
 - Signing in before verifying sends a new code first.
 - **Forgot password?** on the sign-in screen emails a code for setting a new password.
-- **Account > Two-step sign-in** turns on asking for an emailed code after the password
-  at every sign-in. **Resend code** works the same way, and each code signs in once.
+- **Two-step sign-in** on the Profile tab turns on asking for an emailed code after
+  the password at every sign-in. **Resend code** works the same way, and each code signs in once.
 - Sending codes needs the email sender set up; see [Email codes](#email-codes).
 
 ### Purchases tab
@@ -92,20 +92,11 @@ total if your receipt differs. Choose **Enter receipt manually** for anything el
 **Log purchase** deducts the points; **Remove selected purchase** returns them.
 Opening hours are fetched from the SCU dining site when available.
 
-### Friends
+### Friends tab
 
-**Account > Friends** shows your friend ID. Send a request with a friend's ID; once
-they accept, each of you can see the other's display name and balance.
-
-### Find meals
-
-**Menus > Find meals** lists every menu item, or size or option, that costs at most
-the points you enter, cheapest first, with its location. Choose a location to see
-only its items. Items priced at the receipt total aren't listed; a note says how
-many were left out. Select a meal and choose **Save this section** to keep its
-location for quick access; **Show items** jumps back to a saved section and
-**Remove** deletes it. Saved sections are kept with your account. Prices come from
-the dated reference menu.
+Shows your friend ID. Send a request with a friend's ID; once they accept, each of you
+can see the other's display name and balance. Requests you sent stay listed until
+they're answered, and **Remove friend** ends a friendship for both people.
 
 ### Budget tab
 
@@ -224,17 +215,16 @@ again to confirm a passing run. Keep the submitted application branch passing.
   dining habits, and raises the spending alerts that are turned on.
 - `UI/mainui.h` and `UI/mainui.cpp`: connect user actions to the models and update the display.
 - `UI/mainui.ui`: define the layout; edit it in Qt Designer.
-- `UI/main.cpp`: show sign-in, then build the main window, tabs and Account menu.
+- `UI/main.cpp`: show sign-in, then build the main window and its tabs.
 - `UI/authdialog.*`: sign in (with an emailed code when two-step sign-in is on), create
-  an account, verify its email, or reset a password; also the Two-step sign-in menu item.
+  an account, verify its email, or reset a password.
 - `UI/emailsender.*`: send codes through the Apps Script web app (`apps-script/`).
-- `UI/menusearchdialog.*`: find meals within a point limit and keep saved menu sections.
 - `UI/localaccounts.*`: all saved data (accounts, balances, purchases, refunds,
-  corrections, plan settings, friends, saved menu sections) in SQLite. Pages call only
+  corrections, plan settings, friends) in SQLite. Pages call only
   these functions and never open the database themselves.
 - `UI/purchasespage.*`: log and remove purchases and show opening hours.
 - `UI/scumenu.*` and `UI/lunchcatalog.cpp`: SCU locations, menu prices and hours parsing.
-- `UI/friendsdialog.*`: send, accept and view friend requests, see sent requests still
+- `UI/friendspage.*`: the Friends tab; send, accept and view friend requests, see sent requests still
   waiting for an answer, and remove a friend.
 - `tests/`: exercise the model classes with doctest; `test_main.cpp` supplies the test entry point.
 - `tests/ui/`: exercise the widgets, account store and menu parsing.

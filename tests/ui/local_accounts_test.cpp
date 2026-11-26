@@ -775,30 +775,6 @@ TEST_CASE("Removing a friend ends the friendship for both accounts") {
     CHECK(LocalAccounts::sendRequest(bob.accountId, alice.friendId) == Result::Success);
 }
 
-// ---- Saved menu sections ----
-
-TEST_CASE("Menu sections can be saved once, listed and removed") {
-    TestAccountStore store;
-    const auto account = createAccount("menu@scu.edu", "Diner").accountId;
-    CHECK(LocalAccounts::saveSection(account, "   ") == Result::InvalidSettings);
-    CHECK(LocalAccounts::saveSection(account, QString(LocalAccounts::PurchaseTextLimit + 1, 'x'))
-          == Result::InvalidSettings);
-    CHECK(LocalAccounts::saveSection("nobody", "Grill") == Result::StorageError);
-
-    REQUIRE(LocalAccounts::saveSection(account, " Marketplace / Grill ") == Result::Success);
-    REQUIRE(LocalAccounts::saveSection(account, "Marketplace / Grill") == Result::Success);
-    REQUIRE(LocalAccounts::saveSection(account, "Sidebar Cafe") == Result::Success);
-    QStringList sections;
-    REQUIRE(LocalAccounts::loadSavedSections(account, sections));
-    CHECK(sections == QStringList{"Marketplace / Grill", "Sidebar Cafe"});
-
-    REQUIRE(LocalAccounts::removeSection(account, "Marketplace / Grill") == Result::Success);
-    CHECK(LocalAccounts::removeSection(account, "Marketplace / Grill") == Result::SectionUnavailable);
-    REQUIRE(LocalAccounts::loadSavedSections(account, sections));
-    CHECK(sections == QStringList{"Sidebar Cafe"});
-    CHECK_FALSE(LocalAccounts::loadSavedSections("nobody", sections));
-}
-
 // ---- Email codes (T15) ----
 
 namespace {

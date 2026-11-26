@@ -176,7 +176,7 @@ PlanPage::PlanPage(const QString &accountName, QWidget *parent)
     habitsHelp->setWordWrap(true);
     habitsLayout->addWidget(habitsHelp);
     const QStringList dayNames = {tr("Mo&n"), tr("Tu&e"), tr("&Wed"), tr("T&hu"),
-                                  tr("&Fri"), tr("&Sat"), tr("S&un")};
+                                  tr("Fr&i"), tr("&Sat"), tr("S&un")};
     const QStringList fullDayNames = {tr("Monday"), tr("Tuesday"), tr("Wednesday"),
                                       tr("Thursday"), tr("Friday"), tr("Saturday"),
                                       tr("Sunday")};

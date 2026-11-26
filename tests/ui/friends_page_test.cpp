@@ -1,8 +1,8 @@
-// Tests for the Friends dialog (T05): pending sent requests and removing a friend.
+// Tests for the Friends page (T05): pending sent requests and removing a friend.
 // Each test uses a temporary database.
 
 #include "doctest.h"
-#include "friendsdialog.h"
+#include "friendspage.h"
 #include "test_account_store.h"
 #include "test_dialogs.h"
 
@@ -16,15 +16,15 @@ using LocalAccounts::Result;
 
 namespace {
 struct FriendsUi {
-    FriendsDialog &dialog;
+    FriendsPage &page;
 
     template <typename T> T *find(const char *name) {
-        auto *widget = dialog.findChild<T *>(name);
+        auto *widget = page.findChild<T *>(name);
         REQUIRE_MESSAGE(widget, name);
         return widget;
     }
     QPushButton *button(const QString &text) {
-        for (auto *candidate : dialog.findChildren<QPushButton *>()) {
+        for (auto *candidate : page.findChildren<QPushButton *>()) {
             if (candidate->text().remove('&') == text) {
                 return candidate;
             }
@@ -86,8 +86,8 @@ TEST_CASE("Sent requests are listed until the other person answers") {
     TestAccountStore store;
     const People people = createPeople(store);
     {
-        FriendsDialog dialog(people.alice.accountId, people.alice.friendId);
-        FriendsUi ui{dialog};
+        FriendsPage page(people.alice.accountId, people.alice.friendId);
+        FriendsUi ui{page};
         CHECK(ui.sent().isEmpty());
         CHECK_FALSE(ui.find<QLabel>("noSentRequests")->isHidden());
 
@@ -103,8 +103,8 @@ TEST_CASE("Sent requests are listed until the other person answers") {
     // Bob accepts and Carol declines; both leave Alice's sent list.
     REQUIRE(LocalAccounts::respondToRequest(people.bob.accountId, people.alice.friendId, true)
             == Result::Success);
-    FriendsDialog dialog(people.alice.accountId, people.alice.friendId);
-    FriendsUi ui{dialog};
+    FriendsPage page(people.alice.accountId, people.alice.friendId);
+    FriendsUi ui{page};
     CHECK(ui.sent() == QStringList{"Carol (" + people.carol.friendId + "), waiting for an answer"});
     REQUIRE(LocalAccounts::respondToRequest(people.carol.accountId, people.alice.friendId, false)
             == Result::Success);
@@ -123,8 +123,8 @@ TEST_CASE("Removing a friend asks first and ends the friendship for both people"
     makeFriends(people.alice, people.bob);
     makeFriends(people.carol, people.alice);
 
-    FriendsDialog dialog(people.alice.accountId, people.alice.friendId);
-    FriendsUi ui{dialog};
+    FriendsPage page(people.alice.accountId, people.alice.friendId);
+    FriendsUi ui{page};
     auto *remove = ui.find<QPushButton>("removeFriendButton");
     CHECK_FALSE(remove->isEnabled()); // Nothing selected yet.
     REQUIRE(ui.friends()->rowCount() == 2);
@@ -162,8 +162,8 @@ TEST_CASE("After removing a friend, either person can send a new request") {
     REQUIRE(LocalAccounts::removeFriend(people.bob.accountId, people.alice.friendId)
             == Result::Success);
 
-    FriendsDialog dialog(people.alice.accountId, people.alice.friendId);
-    FriendsUi ui{dialog};
+    FriendsPage page(people.alice.accountId, people.alice.friendId);
+    FriendsUi ui{page};
     CHECK(ui.friends()->rowCount() == 0);
     ui.sendRequest(people.bob.friendId);
     CHECK(ui.status() == "Friend request sent.");
@@ -176,10 +176,10 @@ TEST_CASE("Removing a friend who already removed you says so") {
     const People people = createPeople(store);
     makeFriends(people.alice, people.bob);
 
-    FriendsDialog dialog(people.alice.accountId, people.alice.friendId);
-    FriendsUi ui{dialog};
+    FriendsPage page(people.alice.accountId, people.alice.friendId);
+    FriendsUi ui{page};
     ui.friends()->selectRow(0);
-    // Bob removes Alice while her dialog is open.
+    // Bob removes Alice while her page is open.
     REQUIRE(LocalAccounts::removeFriend(people.bob.accountId, people.alice.friendId)
             == Result::Success);
 

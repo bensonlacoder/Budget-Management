@@ -6,6 +6,7 @@
 #include "quarter.h"
 #include "test_account_store.h"
 
+#include <QCheckBox>
 #include <QClipboard>
 #include <QComboBox>
 #include <QDoubleSpinBox>
@@ -231,4 +232,54 @@ TEST_CASE("Changing the password checks each entry") {
           == LocalAccounts::Result::IncorrectCredentials);
     CHECK(LocalAccounts::signIn("pw@scu.edu", "new-password", signedIn)
           == LocalAccounts::Result::Success);
+}
+
+// Author: Nathan Gu
+TEST_CASE("Two-step sign-in is turned on and off from the Profile tab") {
+    TestAccountStore store;
+    const auto created = store.createVerified("twostep@scu.edu", "Careful");
+    ProfilePage page(created.accountId);
+    ProfileUi ui{page};
+    auto *twoStep = ui.find<QCheckBox>("twoStepSignInCheckBox");
+    CHECK_FALSE(twoStep->isChecked());
+
+    twoStep->setChecked(true);
+    CHECK(saved(created.accountId).twoStepSignIn);
+    CHECK(ui.text("signInMessage").startsWith("Two-step sign-in is on."));
+
+    twoStep->setChecked(false);
+    CHECK_FALSE(saved(created.accountId).twoStepSignIn);
+    CHECK(ui.text("signInMessage").startsWith("Two-step sign-in is off."));
+
+    // Reopening the tab shows the saved choice.
+    twoStep->setChecked(true);
+    ProfilePage reopened(created.accountId);
+    CHECK(ProfileUi{reopened}.find<QCheckBox>("twoStepSignInCheckBox")->isChecked());
+}
+
+// Author: Nathan Gu
+TEST_CASE("If two-step sign-in can't be saved, the check box goes back") {
+    TestAccountStore store;
+    const auto created = store.createVerified("broken@scu.edu", "Broken");
+    ProfilePage page(created.accountId);
+    ProfileUi ui{page};
+    auto *twoStep = ui.find<QCheckBox>("twoStepSignInCheckBox");
+    // Point storage at a new, empty database: the account isn't there, so saving fails.
+    LocalAccounts::closeStorage();
+    {
+        TestAccountStore other;
+        twoStep->setChecked(true);
+        CHECK_FALSE(twoStep->isChecked());
+        CHECK(ui.text("signInMessage") == "Couldn't change two-step sign-in. Try again.");
+    }
+}
+
+// Author: Nathan Gu
+TEST_CASE("Sign out on the Profile tab asks the window to sign out") {
+    TestAccountStore store;
+    const auto created = store.createVerified("leaving@scu.edu", "Leaving");
+    ProfilePage page(created.accountId);
+    QSignalSpy signOut(&page, &ProfilePage::signOutRequested);
+    ProfileUi{page}.click("signOutButton");
+    CHECK(signOut.size() == 1);
 }
