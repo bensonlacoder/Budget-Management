@@ -218,10 +218,17 @@ void ChartsPage::refresh() {
     const qint64 fullTarget = cents(weekly ? budget.getWeeklyBudget() : budget.getDailyBudget());
     const auto format = [this](qint64 value) { return locale().toString(value / 100.0, 'f', 2); };
 
-    locations->setRowCount(spending.locations.size());
-    int row = 0;
+    // Biggest net spending first; ties stay in name order.
+    QList<std::pair<QString, qint64>> byPoints;
     for (auto it = spending.locations.cbegin(); it != spending.locations.cend(); ++it) {
-        setRow(locations, row++, {it.key(), format(it.value())});
+        byPoints.append({it.key(), it.value()});
+    }
+    std::stable_sort(byPoints.begin(), byPoints.end(),
+                     [](const auto &left, const auto &right) { return left.second > right.second; });
+    locations->setRowCount(byPoints.size());
+    int row = 0;
+    for (const auto &[venue, points] : byPoints) {
+        setRow(locations, row++, {venue, format(points)});
     }
 
     QList<qint64> actual;
