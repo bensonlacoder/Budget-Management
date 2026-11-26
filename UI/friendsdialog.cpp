@@ -1,4 +1,5 @@
 #include "friendsdialog.h"
+#include "appstyle.h"
 #include "localaccounts.h"
 
 #include <QApplication>
@@ -161,7 +162,7 @@ void FriendsDialog::refresh() {
         name->setData(Qt::UserRole, entry.friendId);
         friends->setItem(row, 0, name);
         friends->setItem(row, 1, new QTableWidgetItem(entry.friendId));
-        auto *balance = new QTableWidgetItem(tr("%1 points").arg(entry.balance, 0, 'f', 2));
+        auto *balance = new QTableWidgetItem(AppStyle::points(entry.balance));
         balance->setTextAlignment(Qt::AlignRight | Qt::AlignVCenter);
         friends->setItem(row, 2, balance);
         ++row;

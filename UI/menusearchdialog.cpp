@@ -1,4 +1,5 @@
 #include "menusearchdialog.h"
+#include "appstyle.h"
 #include "localaccounts.h"
 
 #include <QComboBox>
@@ -98,7 +99,7 @@ MenuSearchDialog::MenuSearchDialog(const QString &account, QWidget *parent)
     maxPoints->setDecimals(POINT_DECIMALS);
     maxPoints->setRange(0.0, MAX_LIMIT);
     maxPoints->setSingleStep(0.5);
-    maxPoints->setSuffix(tr(" pts"));
+    maxPoints->setSuffix(tr(" points"));
     maxPoints->setValue(DEFAULT_LIMIT);
     location->setObjectName("locationFilter");
     location->addItem(tr("All locations"), QString());
@@ -191,12 +192,12 @@ void MenuSearchDialog::search() {
         results->setItem(row, 0, new QTableWidgetItem(match.item));
         results->setItem(row, 1, new QTableWidgetItem(match.location));
         auto *price = new QTableWidgetItem(
-            locale().toString(match.priceInHundredths / 100.0, 'f', POINT_DECIMALS));
+            AppStyle::number(match.priceInHundredths / 100.0));
         price->setTextAlignment(Qt::AlignRight | Qt::AlignVCenter);
         results->setItem(row, 2, price);
     }
 
-    const QString limitText = locale().toString(maxPoints->value(), 'f', POINT_DECIMALS);
+    const QString limitText = AppStyle::number(maxPoints->value());
     QString text = found.isEmpty() ? tr("No meals cost %1 points or less.").arg(limitText)
                  : found.size() == 1 ? tr("1 meal costs %1 points or less.").arg(limitText)
                                      : tr("%1 meals cost %2 points or less, cheapest first.")

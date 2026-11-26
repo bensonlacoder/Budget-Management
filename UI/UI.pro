@@ -9,6 +9,7 @@ SOURCES += \
     ../src/budget.cpp \
     ../src/quarter.cpp \
     ../src/habitscsv.cpp \
+    appstyle.cpp \
     authdialog.cpp \
     chartspage.cpp \
     emailsender.cpp \
@@ -28,6 +29,7 @@ HEADERS += \
     ../src/budget.h \
     ../src/quarter.h \
     ../src/habitscsv.h \
+    appstyle.h \
     authdialog.h \
     chartspage.h \
     emailsender.h \

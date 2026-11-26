@@ -1,4 +1,5 @@
 #include "planpage.h"
+#include "appstyle.h"
 
 #include "habitscsv.h"
 #include "quarter.h"
@@ -71,8 +72,7 @@ PlanPage::PlanPage(const QString &accountName, QWidget *parent)
     auto *layout = new QVBoxLayout(content);
 
     alertsBanner = namedLabel("alertsBanner", content, true);
-    alertsBanner->setStyleSheet(QStringLiteral(
-        "color: #b00020; background: #fdecea; border: 1px solid #f5c2c0; padding: 8px;"));
+    alertsBanner->setStyleSheet(AppStyle::alertBanner(this));
     alertsBanner->hide();
     layout->addWidget(alertsBanner);
 
@@ -133,7 +133,7 @@ PlanPage::PlanPage(const QString &accountName, QWidget *parent)
     auto *projectionLayout = new QVBoxLayout(projectionBox);
     projectionLabel = namedLabel("projectionLabel", projectionBox);
     reserveWarning = namedLabel("reserveWarningLabel", projectionBox, true);
-    reserveWarning->setStyleSheet(QStringLiteral("color: #b00020;"));
+    reserveWarning->setStyleSheet(AppStyle::errorText(this));
     projectionLayout->addWidget(projectionLabel);
     projectionLayout->addWidget(reserveWarning);
     layout->addWidget(projectionBox);
@@ -545,11 +545,11 @@ void PlanPage::showAdvice() {
 }
 
 void PlanPage::showMessage(QLabel *label, const QString &text, bool error) {
-    label->setStyleSheet(error ? QStringLiteral("color: #b00020;") : QString());
+    label->setStyleSheet(error ? AppStyle::errorText(label) : QString());
     label->setText(text);
     label->setVisible(!text.isEmpty());
 }
 
 QString PlanPage::formatPoints(double points) {
-    return tr("%1 points").arg(points, 0, 'f', 2);
+    return AppStyle::points(points);
 }

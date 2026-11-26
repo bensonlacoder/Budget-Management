@@ -1,4 +1,5 @@
 #include "profilepage.h"
+#include "appstyle.h"
 
 #include "quarter.h"
 
@@ -25,7 +26,7 @@ namespace {
 constexpr int DATE_CHECK_INTERVAL_MS = 60 * 1000;
 
 QString formatDate(const QDate &date) {
-    return date.toString(QStringLiteral("MMM d, yyyy"));
+    return AppStyle::date(date);
 }
 
 QString dayCount(int days) {
@@ -222,7 +223,7 @@ void ProfilePage::refresh() {
     diningPlan->setText(planName);
     balance->setText(formatPoints(profile.balance));
     lastUpdated->setText(profile.lastUpdated.isValid()
-                             ? QLocale().toString(profile.lastUpdated, QLocale::ShortFormat)
+                             ? AppStyle::dateTime(profile.lastUpdated)
                              : tr("Not yet"));
 
     const int left = daysLeftFor(profile, shownDate);
@@ -366,10 +367,10 @@ void ProfilePage::changePassword() {
 }
 
 void ProfilePage::showMessage(QLabel *label, const QString &text, bool error) {
-    label->setStyleSheet(error ? QStringLiteral("color: #b00020;") : QString());
+    label->setStyleSheet(error ? AppStyle::errorText(label) : QString());
     label->setText(text);
 }
 
 QString ProfilePage::formatPoints(double points) {
-    return tr("%1 points").arg(points, 0, 'f', 2);
+    return AppStyle::points(points);
 }
