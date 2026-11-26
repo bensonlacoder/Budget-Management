@@ -260,8 +260,13 @@ alert applies; at 10 a day it does not. With either alert off, nothing appears.
   and balance corrections that lower the balance count as **Unlogged**. Standalone
   refunds reduce spending under **Standalone refunds**. Corrections that increase the
   balance are excluded.
-- Past periods are compared with the current Plan budget, calculated from the saved
-  balance, reserve, and days remaining. Historical budget snapshots are not stored.
-  Weeks run Monday through Sunday. For a partial week at either end of the selected
-  range, the weekly budget is multiplied by the fraction of days included and rounded
-  down to the nearest hundredth.
+- Each day is compared with the daily budget it had at its start, so a day's budget
+  doesn't change after the day is over. It is rebuilt from the history rather than
+  stored: the day's starting balance is today's balance with every change dated on or
+  after that day undone, and its days remaining are today's plus the days that have
+  passed. The budget is then (starting balance - reserve) / days remaining, rounded
+  down to the hundredth, as in SP-04 and SP-09. The current reserve goal is used for
+  every day, since past reserve goals aren't saved.
+- Weeks run Monday through Sunday. A week's budget is the sum of the daily budgets of
+  its days inside the selected range, so a partial week at either end counts only
+  those days. Date ranges end today at the latest.

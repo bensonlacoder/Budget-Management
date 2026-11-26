@@ -108,6 +108,9 @@ ChartsPage::ChartsPage(const QString &accountName, QWidget *parent)
     to->setObjectName("chartsTo");
     from->setCalendarPopup(true);
     to->setCalendarPopup(true);
+    // Budgets are only known up to today.
+    from->setMaximumDate(QDate::currentDate());
+    to->setMaximumDate(QDate::currentDate());
     period->setObjectName("chartsPeriod");
     period->addItems({tr("Daily"), tr("Weekly")});
 
@@ -176,6 +179,34 @@ ChartsPage::Spending ChartsPage::summarize(const QList<LocalAccounts::HistoryEnt
     return spending;
 }
 
+QMap<QDate, qint64> ChartsPage::dailyBudgets(const QList<LocalAccounts::HistoryEntry> &history,
+                                             double balanceToday, double reserveGoal,
+                                             int daysLeftToday, const QDate &today,
+                                             const QDate &from, const QDate &to) {
+    QMap<QDate, qint64> budgets;
+    for (QDate day = from; day <= to; day = day.addDays(1)) {
+        const QDate asOf = std::min(day, today);
+        // Undo every change made on or after the day to get its starting balance.
+        qint64 startCents = cents(balanceToday);
+        for (const auto &entry : history) {
+            if (entry.date >= asOf) {
+                startCents -= cents(entry.balanceChange);
+            }
+        }
+        const int daysLeft = std::clamp(
+            daysLeftToday + static_cast<int>(asOf.daysTo(today)), 0,
+            LocalAccounts::MaxRemainingDays);
+        const double start = std::max<qint64>(0, startCents) / 100.0;
+        // Set the reserve against a balance that covers it, as the Plan tab does.
+        Balance balance(std::max(start, reserveGoal));
+        Budget budget(balance, daysLeft);
+        budget.setReserveGoal(reserveGoal);
+        balance.setBalance(start);
+        budgets.insert(day, cents(budget.getDailyBudget()));
+    }
+    return budgets;
+}
+
 void ChartsPage::refresh() {
     locations->setRowCount(0);
     comparison->setRowCount(0);
@@ -208,14 +239,12 @@ void ChartsPage::refresh() {
         return;
     }
 
+    const QDate today = QDate::currentDate();
     const int days = std::clamp(
-        Quarter::daysLeft(QDate::currentDate(), profile.daysCorrected, profile.remainingDays),
-        0, LocalAccounts::MaxRemainingDays);
-    Balance balance(std::max(profile.balance, settings.reserveGoal));
-    Budget budget(balance, days);
-    budget.setReserveGoal(settings.reserveGoal);
-    balance.setBalance(profile.balance);
-    const qint64 fullTarget = cents(weekly ? budget.getWeeklyBudget() : budget.getDailyBudget());
+        Quarter::daysLeft(today, profile.daysCorrected, profile.remainingDays), 0,
+        LocalAccounts::MaxRemainingDays);
+    const auto budgets = dailyBudgets(history, profile.balance, settings.reserveGoal, days,
+                                      today, start, end);
     const auto format = [this](qint64 value) { return locale().toString(value / 100.0, 'f', 2); };
 
     // Biggest net spending first; ties stay in name order.
@@ -238,9 +267,12 @@ void ChartsPage::refresh() {
     comparison->setRowCount(firstPeriod.daysTo(end) / step + 1);
     for (int i = 0; i < comparison->rowCount(); ++i) {
         const QDate date = firstPeriod.addDays(qint64(i) * step);
-        const qint64 coveredDays = std::max(start, date).daysTo(
-            std::min(end, date.addDays(step - 1))) + 1;
-        const qint64 target = fullTarget * coveredDays / step;
+        // A week's budget is the sum of its days' budgets inside the range.
+        qint64 target = 0;
+        for (QDate day = std::max(start, date); day <= std::min(end, date.addDays(step - 1));
+             day = day.addDays(1)) {
+            target += budgets.value(day);
+        }
         const qint64 total = spending.periods.value(date);
         const qint64 difference = total - target;
         const QString label = weekly
@@ -257,6 +289,8 @@ void ChartsPage::refresh() {
     chart->show();
     comparison->show();
     locations->show();
-    status->setText(weekly ? tr("Weekly totals use Monday–Sunday weeks. Partial weeks use a prorated budget.")
-                           : tr("Daily totals use the selected date range."));
+    status->setText(weekly
+        ? tr("Each week's budget adds up the daily budgets you had on its days. Weeks run "
+             "Monday to Sunday.")
+        : tr("Each day is compared with the daily budget you had at the start of that day."));
 }
