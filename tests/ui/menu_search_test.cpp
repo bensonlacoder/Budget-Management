@@ -4,16 +4,14 @@
 #include "doctest.h"
 #include "menusearchdialog.h"
 #include "test_account_store.h"
+#include "test_dialogs.h"
 
 #include <QComboBox>
 #include <QDoubleSpinBox>
 #include <QLabel>
-#include <QApplication>
 #include <QListWidget>
-#include <QMessageBox>
 #include <QPushButton>
 #include <QTableWidget>
-#include <QTimer>
 
 namespace {
 // A small catalog with known prices, in hundredths of a point.
@@ -28,26 +26,6 @@ QList<ScuMenu::Location> sampleCatalog() {
                    {"Combo", 900, "Side", {{"Fries", 900}, {"Onion rings", ReceiptPrice}}}}},
         {"Closed station", {}},
     };
-}
-
-// Clicks the button labeled `choice` on the next confirmation box, once it opens, and
-// records the box's question in `question`.
-void answerConfirmation(const QString &choice, QString &question) {
-    auto *timer = new QTimer;
-    QObject::connect(timer, &QTimer::timeout, timer, [timer, choice, &question] {
-        auto *box = qobject_cast<QMessageBox *>(QApplication::activeModalWidget());
-        if (!box) {
-            return; // Not open yet.
-        }
-        question = box->text();
-        for (QAbstractButton *button : box->buttons()) {
-            if (button->text().remove('&') == choice) {
-                button->click();
-            }
-        }
-        timer->deleteLater();
-    });
-    timer->start(10);
 }
 
 QStringList names(const QList<MenuSearch::Match> &found) {

@@ -234,7 +234,8 @@ again to confirm a passing run. Keep the submitted application branch passing.
   these functions and never open the database themselves.
 - `UI/purchasespage.*`: log and remove purchases and show opening hours.
 - `UI/scumenu.*` and `UI/lunchcatalog.cpp`: SCU locations, menu prices and hours parsing.
-- `UI/friendsdialog.*`: send, accept and view friend requests.
+- `UI/friendsdialog.*`: send, accept and view friend requests, see sent requests still
+  waiting for an answer, and remove a friend.
 - `tests/`: exercise the model classes with doctest; `test_main.cpp` supplies the test entry point.
 - `tests/ui/`: exercise the widgets, account store and menu parsing.
 - `.github/workflows/ci.yml`: build and test the project in GitHub Actions.

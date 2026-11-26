@@ -36,9 +36,9 @@
 | ✅ FR-24 | View and copy a shareable friend ID. |
 | ✅ FR-25 | Look up an exact friend ID in a search field and send a friend request. |
 | ✅ FR-26 | View incoming friend requests and choose whether to accept or decline each one. |
-| FR-27 | See which outgoing friend requests are still pending. |
+| ✅ FR-27 | See which outgoing friend requests are still pending. |
 | ✅ FR-28 | View an accepted friend's display name and remaining dining-point balance. Keep email, sign-in details, purchase history, and other private account data out of the friend profile. |
-| FR-29 | Remove a friend and end access to each other's dining-point balances. |
+| ✅ FR-29 | Remove a friend and end access to each other's dining-point balances. |
 | ✅ FR-30 | Get clear feedback when a friend ID is unknown, belongs to the signed-in user, or already has a pending request or friendship. |
 
 ### Enter, update, and record
