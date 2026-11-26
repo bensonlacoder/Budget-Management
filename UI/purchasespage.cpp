@@ -161,17 +161,19 @@ PurchasesPage::PurchasesPage(const QString &accountName, QWidget *parent)
     source->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
     source->setOpenExternalLinks(true);
     auto *reload = new QPushButton(tr("Refresh hours"), entry);
-    auto *sources = new QHBoxLayout;
-    sources->addWidget(source);
-    sources->addStretch();
-    sources->addWidget(reload);
-    form->addRow(menuStatus);
-    form->addRow(sources);
     auto *save = new QPushButton(tr("Lo&g purchase"), entry);
     save->setObjectName("logPurchaseButton");
     save->setAutoDefault(false);
-    form->addRow(save);
+    // Menu links on the left, the form's action on the right, in one row.
+    auto *sources = new QHBoxLayout;
+    sources->addWidget(source);
+    sources->addWidget(reload);
+    sources->addStretch();
+    sources->addWidget(save);
+    form->addRow(menuStatus);
+    form->addRow(sources);
     form->addRow(feedback);
+    form->setRowVisible(feedback, false); // Shown by showFeedback() once there is text.
 
     auto *historyGroup = new QGroupBox(tr("Purchase history"), this);
     history->setObjectName("purchaseHistory");
@@ -195,19 +197,20 @@ PurchasesPage::PurchasesPage(const QString &accountName, QWidget *parent)
     filterTo->setCalendarPopup(true);
     filterFrom->setEnabled(false);
     filterTo->setEnabled(false);
-    auto *filters = new QFormLayout;
-    auto *dateRange = new QHBoxLayout;
-    dateRange->addWidget(filterDates);
-    dateRange->addWidget(filterFrom);
-    dateRange->addWidget(new QLabel(tr("through"), this));
-    dateRange->addWidget(filterTo);
-    filters->addRow(dateRange);
-    auto *locationFilter = new QHBoxLayout;
-    locationFilter->addWidget(filterLocation, 1);
+    // All filters in one row: dates, then location, then Clear.
+    auto *filters = new QHBoxLayout;
+    filters->addWidget(filterDates);
+    filters->addWidget(filterFrom);
+    filters->addWidget(new QLabel(tr("through"), this));
+    filters->addWidget(filterTo);
+    filters->addSpacing(12);
+    auto *locationLabel = new QLabel(tr("Location"), this);
+    locationLabel->setBuddy(filterLocation);
+    filters->addWidget(locationLabel);
+    filters->addWidget(filterLocation, 1);
     auto *clear = new QPushButton(tr("Clear filters"), this);
     clear->setObjectName("clearHistoryFilters");
-    locationFilter->addWidget(clear);
-    filters->addRow(tr("Location"), locationFilter);
+    filters->addWidget(clear);
     historyLayout->addLayout(filters);
     historyStatus->setObjectName("historyStatus");
     historyLayout->addWidget(historyStatus);
@@ -218,15 +221,19 @@ PurchasesPage::PurchasesPage(const QString &accountName, QWidget *parent)
     refundPurchase->setEnabled(false);
     auto *refund = new QPushButton(tr("Log standalone refund"), this);
     refund->setObjectName("standaloneRefundButton");
-    auto *actions = new QGridLayout;
-    actions->addWidget(editEntry, 0, 0);
-    actions->addWidget(removePurchase, 0, 1);
-    actions->addWidget(refundPurchase, 1, 0);
-    actions->addWidget(refund, 1, 1);
+    // Actions on the selected row on the left; the one that needs no selection apart.
+    auto *actions = new QHBoxLayout;
+    actions->addWidget(editEntry);
+    actions->addWidget(removePurchase);
+    actions->addWidget(refundPurchase);
+    actions->addStretch();
+    actions->addWidget(refund);
     historyLayout->addLayout(actions);
 
     auto *layout = new QVBoxLayout(this);
     layout->addWidget(balanceLabel);
+    // The form keeps its natural height; any extra space goes to the history.
+    entry->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Maximum);
     layout->addWidget(entry);
     layout->addWidget(historyGroup, 1);
 
@@ -270,6 +277,11 @@ PurchasesPage::PurchasesPage(const QString &accountName, QWidget *parent)
     connect(clock, &QTimer::timeout, this, [this] { refreshHours(); });
     clock->start(60000);
     QTimer::singleShot(0, this, [this] { refreshHours(); });
+}
+
+void PurchasesPage::showFeedback(const QString &text) {
+    feedback->setText(text);
+    form->setRowVisible(feedback, !text.isEmpty());
 }
 
 void PurchasesPage::showBalance(double balance) {
@@ -407,7 +419,7 @@ void PurchasesPage::updateLocationHours() {
     }
     const QString name = selectedLocation();
     hoursLabel->setText(name.isEmpty() ? QString{} : hoursText(locationSchedule(name), now));
-    hoursLabel->setVisible(!name.isEmpty());
+    form->setRowVisible(hoursLabel, !name.isEmpty());
 }
 
 QString PurchasesPage::selectedLocation() const {
@@ -458,7 +470,7 @@ void PurchasesPage::useMenuItem(int index) {
     }
     form->setRowVisible(choice, choice->count() > 0);
     form->setRowVisible(extras, !extraChecks.isEmpty());
-    menuStatus->setVisible(!selectedLocation().isEmpty());
+    form->setRowVisible(menuStatus, !selectedLocation().isEmpty());
 }
 
 void PurchasesPage::updateConfiguredPrice() {
@@ -507,16 +519,16 @@ void PurchasesPage::recordPurchase() {
         menuItem->setCurrentIndex(0);
         item->clear();
         points->setValue(0.0);
-        feedback->setText(tr("Purchase logged."));
+        showFeedback(tr("Purchase logged."));
         break;
     case Result::InvalidPurchase:
-        feedback->setText(tr("Enter a location, a date up to today, and an amount greater than zero."));
+        showFeedback(tr("Enter a location, a date up to today, and an amount greater than zero."));
         break;
     case Result::InsufficientPoints:
-        feedback->setText(tr("This purchase costs more points than your saved balance."));
+        showFeedback(tr("This purchase costs more points than your saved balance."));
         break;
     default:
-        feedback->setText(tr("Could not save the purchase. Try again."));
+        showFeedback(tr("Could not save the purchase. Try again."));
         break;
     }
 }
@@ -553,9 +565,9 @@ void PurchasesPage::removeSelectedEntry() {
     if (result == Result::Success) {
         showBalance(newBalance);
         emit balanceUpdated(newBalance);
-        feedback->setText(refund ? tr("Refund removed.") : tr("Purchase removed."));
+        showFeedback(refund ? tr("Refund removed.") : tr("Purchase removed."));
     } else {
-        feedback->setText(transactionError(result));
+        showFeedback(transactionError(result));
         refreshHistory();
     }
 }
@@ -613,7 +625,7 @@ void PurchasesPage::editSelectedEntry() {
     if (dialog.exec() == QDialog::Accepted) {
         showBalance(newBalance);
         emit balanceUpdated(newBalance);
-        feedback->setText(tr("Purchase updated."));
+        showFeedback(tr("Purchase updated."));
     }
 }
 
@@ -629,7 +641,7 @@ void PurchasesPage::refundSelectedPurchase() {
         }
     }
     if (available < 0.005) {
-        feedback->setText(tr("This purchase has already been fully refunded."));
+        showFeedback(tr("This purchase has already been fully refunded."));
         return;
     }
     refundDialog({QDate::currentDate(), available, entry->id});
@@ -684,7 +696,7 @@ void PurchasesPage::refundDialog(const LocalAccounts::Refund &refund) {
     if (dialog.exec() == QDialog::Accepted) {
         showBalance(newBalance);
         emit balanceUpdated(newBalance);
-        feedback->setText(refund.id.isEmpty() ? tr("Refund logged.") : tr("Refund updated."));
+        showFeedback(refund.id.isEmpty() ? tr("Refund logged.") : tr("Refund updated."));
     }
 }
 

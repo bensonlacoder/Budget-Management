@@ -40,6 +40,8 @@ private:
     void useMenuItem(int index);
     void updateConfiguredPrice();
     void recordPurchase();
+    // Sets the message under the form, which takes space only when it has text.
+    void showFeedback(const QString &text);
     void removeSelectedEntry();
     void editSelectedEntry();
     void refundSelectedPurchase();
