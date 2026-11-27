@@ -6,7 +6,10 @@
 #include <QLocale>
 #include <QString>
 
+class QApplication;
+class QColor;
 class QDateEdit;
+class QPushButton;
 class QWidget;
 
 // One way to write points, dates and status colors on every page, so the same value
@@ -42,6 +45,20 @@ QString errorText(const QWidget *widget);
 QString alertBanner(const QWidget *widget);
 // A tinted box for a neutral notice, such as the sandbox explanation.
 QString noticeBanner(const QWidget *widget);
+
+// ---- Theme ----
+// Sets the app's look once at start-up: the Fusion style (the same on Windows and
+// macOS), 10.5 pt body text, SCU Cardinal Red as the accent, cards for sections, and
+// light and dark palettes that follow the system setting, even when it changes.
+void applyTheme(QApplication &app);
+// SCU Cardinal Red, #862633.
+QColor accent();
+// Shows the button as its section's main action: filled in Cardinal Red.
+void markPrimary(QPushButton *button);
+// Gives a label a step of the type scale instead of body text. Roles:
+// "headline" (18 pt bold, the page's key figure), "balance" (14 pt bold),
+// "figure" (12 pt bold) and "strong" (bold body text).
+void setTextRole(QWidget *widget, const char *role);
 } // namespace AppStyle
 
 #endif // APPSTYLE_H

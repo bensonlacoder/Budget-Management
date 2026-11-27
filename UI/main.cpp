@@ -1,3 +1,4 @@
+#include "appstyle.h"
 #include "authdialog.h"
 #include "chartspage.h"
 #include "friendspage.h"
@@ -8,13 +9,18 @@
 
 #include <QApplication>
 #include <QMessageBox>
+#include <QScreen>
 
+#include <algorithm>
 #include <optional>
 
 int main(int argc, char *argv[]) {
     QApplication app(argc, argv);
     app.setApplicationName("DiningPointsBudget");
     app.setApplicationDisplayName(QObject::tr("Dining Points Budget"));
+    // Numbers, dates and number fields read the same on every computer (AppStyle).
+    QLocale::setDefault(AppStyle::locale());
+    AppStyle::applyTheme(app);
 
     AuthDialog auth;
     auth.setAttribute(Qt::WA_QuitOnClose, false);
@@ -67,6 +73,11 @@ int main(int argc, char *argv[]) {
             window->hide();
             window->deleteLater();
         });
+        // A comfortable size on a laptop, but never larger than the screen allows,
+        // for example at 125% or 150% display scaling.
+        const QRect screen = window->screen()->availableGeometry();
+        window->resize(std::min(960, screen.width() * 9 / 10),
+                       std::min(720, screen.height() * 9 / 10));
         window->show();
     });
     auth.show();

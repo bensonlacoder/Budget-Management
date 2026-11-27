@@ -22,7 +22,7 @@ set(PURCHASE_SOURCES UI/purchasespage.cpp UI/purchasespage.h UI/scumenu.cpp UI/s
     UI/appstyle.cpp UI/appstyle.h)
 
 # Main window and tab pages, shared by the app and the UI tests.
-set(PAGE_SOURCES UI/mainui.cpp UI/mainui.h UI/mainui.ui
+set(PAGE_SOURCES UI/mainui.cpp UI/mainui.h UI/mainui.ui UI/resources.qrc
     UI/authdialog.cpp UI/authdialog.h
     UI/friendspage.cpp UI/friendspage.h
     UI/planpage.cpp UI/planpage.h

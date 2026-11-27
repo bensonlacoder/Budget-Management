@@ -24,6 +24,7 @@
 #include <QNetworkReply>
 #include <QNetworkRequest>
 #include <QPushButton>
+#include <QResizeEvent>
 #include <QSignalBlocker>
 #include <QSizePolicy>
 #include <QStyle>
@@ -109,10 +110,7 @@ PurchasesPage::PurchasesPage(const QString &accountName, QWidget *parent)
       filterTo(new QDateEdit(QDate::currentDate(), this)),
       filterLocation(new QComboBox(this)),
       network(new QNetworkAccessManager(this)) {
-    QFont balanceFont = balanceLabel->font();
-    balanceFont.setPointSize(14);
-    balanceFont.setBold(true);
-    balanceLabel->setFont(balanceFont);
+    AppStyle::setTextRole(balanceLabel, "balance");
     balanceLabel->setObjectName("purchaseBalance");
 
     date->setObjectName("purchaseDate");
@@ -165,6 +163,7 @@ PurchasesPage::PurchasesPage(const QString &accountName, QWidget *parent)
     auto *reload = new QPushButton(tr("Refresh hours"), entry);
     auto *save = new QPushButton(tr("Lo&g purchase"), entry);
     save->setObjectName("logPurchaseButton");
+    AppStyle::markPrimary(save);
     save->setAutoDefault(false);
     // Menu links on the left, the form's action on the right, in one row.
     auto *sources = new QHBoxLayout;
@@ -201,21 +200,22 @@ PurchasesPage::PurchasesPage(const QString &accountName, QWidget *parent)
     AppStyle::useDateFormat(filterTo);
     filterFrom->setEnabled(false);
     filterTo->setEnabled(false);
-    // All filters in one row: dates, then location, then Clear.
-    auto *filters = new QHBoxLayout;
-    filters->addWidget(filterDates);
-    filters->addWidget(filterFrom);
-    filters->addWidget(new QLabel(tr("through"), this));
-    filters->addWidget(filterTo);
-    filters->addSpacing(12);
+    // Filters: dates on one row, location and Clear on the next.
+    auto *dateFilter = new QHBoxLayout;
+    dateFilter->addWidget(filterDates);
+    dateFilter->addWidget(filterFrom, 1);
+    dateFilter->addWidget(new QLabel(tr("through"), this));
+    dateFilter->addWidget(filterTo, 1);
+    auto *locationFilter = new QHBoxLayout;
     auto *locationLabel = new QLabel(tr("Location"), this);
     locationLabel->setBuddy(filterLocation);
-    filters->addWidget(locationLabel);
-    filters->addWidget(filterLocation, 1);
+    locationFilter->addWidget(locationLabel);
+    locationFilter->addWidget(filterLocation, 1);
     auto *clear = new QPushButton(tr("Clear filters"), this);
     clear->setObjectName("clearHistoryFilters");
-    filters->addWidget(clear);
-    historyLayout->addLayout(filters);
+    locationFilter->addWidget(clear);
+    historyLayout->addLayout(dateFilter);
+    historyLayout->addLayout(locationFilter);
     historyStatus->setObjectName("historyStatus");
     historyLayout->addWidget(historyStatus);
     historyLayout->addWidget(history);
@@ -225,21 +225,29 @@ PurchasesPage::PurchasesPage(const QString &accountName, QWidget *parent)
     refundPurchase->setEnabled(false);
     auto *refund = new QPushButton(tr("Log standalone refund"), this);
     refund->setObjectName("standaloneRefundButton");
-    // Actions on the selected row on the left; the one that needs no selection apart.
+    // Actions on the selected row; below them, the one that needs no selection.
     auto *actions = new QHBoxLayout;
     actions->addWidget(editEntry);
     actions->addWidget(removePurchase);
     actions->addWidget(refundPurchase);
     actions->addStretch();
-    actions->addWidget(refund);
+    auto *otherActions = new QHBoxLayout;
+    otherActions->addStretch();
+    otherActions->addWidget(refund);
     historyLayout->addLayout(actions);
+    historyLayout->addLayout(otherActions);
 
-    auto *layout = new QVBoxLayout(this);
-    layout->addWidget(balanceLabel);
     // The form keeps its natural height; any extra space goes to the history.
     entry->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Maximum);
-    layout->addWidget(entry);
-    layout->addWidget(historyGroup, 1);
+    auto *entryColumn = new QVBoxLayout;
+    entryColumn->addWidget(entry);
+    entryColumn->addStretch();
+    columns = new QBoxLayout(QBoxLayout::TopToBottom);
+    columns->addLayout(entryColumn, 2);
+    columns->addWidget(historyGroup, 3);
+    auto *layout = new QVBoxLayout(this);
+    layout->addWidget(balanceLabel);
+    layout->addLayout(columns, 1);
 
     connect(location, &QComboBox::currentTextChanged, this, [this] {
         updateMenuItems();
@@ -281,6 +289,14 @@ PurchasesPage::PurchasesPage(const QString &accountName, QWidget *parent)
     connect(clock, &QTimer::timeout, this, [this] { refreshHours(); });
     clock->start(60000);
     QTimer::singleShot(0, this, [this] { refreshHours(); });
+}
+
+void PurchasesPage::resizeEvent(QResizeEvent *event) {
+    QWidget::resizeEvent(event);
+    // Side by side when there's room, so the history gets the full height; stacked
+    // on narrow windows.
+    columns->setDirection(width() >= TwoColumnWidth ? QBoxLayout::LeftToRight
+                                                    : QBoxLayout::TopToBottom);
 }
 
 void PurchasesPage::showFeedback(const QString &text) {

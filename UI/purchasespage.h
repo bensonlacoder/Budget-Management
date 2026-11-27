@@ -9,6 +9,7 @@
 #include <QWidget>
 
 class QCheckBox;
+class QBoxLayout;
 class QComboBox;
 class QFormLayout;
 class QGridLayout;
@@ -18,6 +19,7 @@ class QLabel;
 class QLineEdit;
 class QNetworkAccessManager;
 class QPushButton;
+class QResizeEvent;
 class QTableWidget;
 
 class PurchasesPage : public QWidget {
@@ -27,8 +29,14 @@ public:
     explicit PurchasesPage(const QString &accountName, QWidget *parent = nullptr);
     void showBalance(double balance);
 
+    // Windows at least this wide show the form and the history side by side.
+    static constexpr int TwoColumnWidth = 880;
+
 signals:
     void balanceUpdated(double newBalance);
+
+protected:
+    void resizeEvent(QResizeEvent *event) override;
 
 private:
     void updateMenuItems();
@@ -69,6 +77,7 @@ private:
     QLabel *feedback;
     QLabel *historyStatus;
     QTableWidget *history;
+    QBoxLayout *columns;
     QPushButton *removePurchase;
     QPushButton *editEntry;
     QPushButton *refundPurchase;

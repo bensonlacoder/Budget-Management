@@ -32,6 +32,7 @@ FriendsPage::FriendsPage(const QString &accountName, const QString &friendId, QW
     requestId->setObjectName("requestFriendId");
     auto *copy = new QPushButton(tr("C&opy ID"), this);
     auto *send = new QPushButton(tr("&Send request"), this);
+    AppStyle::markPrimary(send);
     auto *idRow = new QHBoxLayout;
     idRow->addWidget(ownId);
     idRow->addWidget(copy);
@@ -49,6 +50,7 @@ FriendsPage::FriendsPage(const QString &accountName, const QString &friendId, QW
     auto *incoming = new QGroupBox(tr("Incoming requests"), this);
     requests->setObjectName("incomingRequests");
     auto *accept = new QPushButton(tr("&Accept"), incoming);
+    AppStyle::markPrimary(accept);
     auto *decline = new QPushButton(tr("D&ecline"), incoming);
     accept->setEnabled(false);
     decline->setEnabled(false);

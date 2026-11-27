@@ -49,6 +49,14 @@ QPushButton *button(const QString &text, const char *name, QWidget *parent) {
     return result;
 }
 
+// A row holding just `button`, at its normal width on the right.
+QHBoxLayout *rightAligned(QPushButton *button) {
+    auto *row = new QHBoxLayout;
+    row->addStretch();
+    row->addWidget(button);
+    return row;
+}
+
 QLineEdit *passwordEdit(const char *name, QWidget *parent) {
     auto *edit = new QLineEdit(parent);
     edit->setObjectName(QLatin1String(name));
@@ -74,8 +82,9 @@ ProfilePage::ProfilePage(const QString &accountName, QWidget *parent)
     accountForm->addRow(tr("Display &name:"), displayName);
     accountForm->addRow(tr("&Email:"), email);
     auto *saveProfileButton = button(tr("Save profile"), "saveProfileButton", accountBox);
+    AppStyle::markPrimary(saveProfileButton);
     profileMessage = messageLabel("profileMessage", accountBox);
-    accountForm->addRow(QString(), saveProfileButton);
+    accountForm->addRow(QString(), rightAligned(saveProfileButton));
     accountForm->addRow(QString(), profileMessage);
 
     friendId = new QLabel(accountBox);
@@ -97,9 +106,7 @@ ProfilePage::ProfilePage(const QString &accountName, QWidget *parent)
     auto *balanceForm = new QFormLayout(balanceBox);
     balance = new QLabel(balanceBox);
     balance->setObjectName("balanceLabel");
-    QFont bold = balance->font();
-    bold.setBold(true);
-    balance->setFont(bold);
+    AppStyle::setTextRole(balance, "strong");
     balanceForm->addRow(tr("Points left:"), balance);
     lastUpdated = new QLabel(balanceBox);
     lastUpdated->setObjectName("lastUpdatedLabel");
@@ -114,6 +121,7 @@ ProfilePage::ProfilePage(const QString &accountName, QWidget *parent)
     correctionAmount->setDecimals(2);
     correctionAmount->setRange(0.0, LocalAccounts::MaxPurchasePoints);
     auto *correctButton = button(tr("Correct balance"), "correctBalanceButton", balanceBox);
+    AppStyle::markPrimary(correctButton);
     auto *correctionRow = new QHBoxLayout;
     correctionRow->addWidget(correctionMode);
     correctionRow->addWidget(correctionAmount, 1);
@@ -131,7 +139,7 @@ ProfilePage::ProfilePage(const QString &accountName, QWidget *parent)
     auto *daysForm = new QFormLayout(daysBox);
     days = new QLabel(daysBox);
     days->setObjectName("daysLabel");
-    days->setFont(bold);
+    AppStyle::setTextRole(days, "strong");
     daysForm->addRow(tr("Days left (including today):"), days);
     quarter = new QLabel(daysBox);
     quarter->setObjectName("quarterLabel");
@@ -144,6 +152,7 @@ ProfilePage::ProfilePage(const QString &accountName, QWidget *parent)
                                   "goes down by one each day.")
                                    .arg(LocalAccounts::MaxRemainingDays));
     auto *correctDaysButton = button(tr("Correct days"), "correctDaysButton", daysBox);
+    AppStyle::markPrimary(correctDaysButton);
     resetDaysButton = button(tr("Reset days"), "resetDaysButton", daysBox);
     resetDaysButton->setToolTip(tr("Use the days left from the quarter calendar again."));
     auto *daysRow = new QHBoxLayout;
@@ -168,8 +177,9 @@ ProfilePage::ProfilePage(const QString &accountName, QWidget *parent)
     passwordForm->addRow(tr("Confir&m new password:"), confirmPassword);
     auto *changePasswordButton =
         button(tr("Change password"), "changePasswordButton", passwordBox);
+    AppStyle::markPrimary(changePasswordButton);
     passwordMessage = messageLabel("passwordMessage", passwordBox);
-    passwordForm->addRow(QString(), changePasswordButton);
+    passwordForm->addRow(QString(), rightAligned(changePasswordButton));
     passwordForm->addRow(QString(), passwordMessage);
     layout->addWidget(passwordBox);
 
