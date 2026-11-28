@@ -3,7 +3,9 @@
 #include <QApplication>
 #include <QDateEdit>
 #include <QFont>
+#include <QPainter>
 #include <QPalette>
+#include <QPixmap>
 #include <QProxyStyle>
 #include <QPushButton>
 #include <QStyle>
@@ -67,10 +69,10 @@ struct Theme {
 
 constexpr Theme LIGHT{"#f6f3f2", "#ffffff", "#1f1a1b", "#5e5557", "#6e6466", "#e3dcda",
                       "#c9c0be", "#f5efee", "#ebe3e1", "#faf6f5", "#f3dfe2", "#9d9395",
-                      CARDINAL, "#c7a4aa"};
+                      CARDINAL, "#ecdcde"};
 constexpr Theme DARK{"#1b1819", "#262223", "#f2eded", "#bdb3b4", "#a9a0a1", "#3a3435",
                      "#575051", "#312c2d", "#3b3536", "#2c2728", "#4a2a30", "#7d7475",
-                     "#f0a3ab", "#5a3a3f"};
+                     "#f0a3ab", "#43333a"};
 
 QPalette palette(const Theme &theme) {
     QPalette palette;
@@ -122,19 +124,23 @@ QGroupBox * { font-size: 10.5pt; font-weight: 400; }
 *[textRole="figure"] { font-size: 12pt; font-weight: 700; }
 *[textRole="strong"] { font-weight: 700; }
 
-QPushButton { background: @card; color: @text; border: 1px solid @field;
-    border-radius: 6px; padding: 6px 14px; min-height: 20px; }
-QPushButton:hover { background: @hover; }
-QPushButton:pressed { background: @pressed; }
-QPushButton:focus { border: 1px solid @cardinal; }
-QPushButton:disabled { color: @disabled; background: @window; border-color: @border; }
-QPushButton[primary="true"] { background: @cardinal; color: #ffffff;
-    border: 1px solid @cardinal; font-weight: 600; }
-QPushButton[primary="true"]:hover { background: @cardinalHover; border-color: @cardinalHover; }
-QPushButton[primary="true"]:pressed { background: @cardinalPressed; }
-QPushButton[primary="true"]:focus { border: 2px solid @text; }
-QPushButton[primary="true"]:disabled { background: @primaryDisabled;
-    border-color: @primaryDisabled; color: #ffffff; }
+/* Every button is Cardinal Red. Disabled ones turn pale with gray text, so they read
+   as unavailable rather than as a lighter red. */
+QPushButton { background: @cardinal; color: #ffffff; border: 1px solid @cardinal;
+    border-radius: 6px; padding: 6px 14px; min-height: 20px; font-weight: 600; }
+QPushButton:hover { background: @cardinalHover; border-color: @cardinalHover; }
+QPushButton:pressed { background: @cardinalPressed; border-color: @cardinalPressed; }
+QPushButton:focus { border: 2px solid @text; }
+QPushButton:disabled { background: @primaryDisabled; border-color: @primaryDisabled;
+    color: @disabled; }
+/* A clear button for the gentler of two choices, such as Decline beside Accept. */
+QPushButton[secondary="true"] { background: @card; color: @text; border: 1px solid @field;
+    font-weight: 400; }
+QPushButton[secondary="true"]:hover { background: @hover; }
+QPushButton[secondary="true"]:pressed { background: @pressed; }
+QPushButton[secondary="true"]:focus { border: 2px solid @cardinal; }
+QPushButton[secondary="true"]:disabled { background: @window; color: @disabled;
+    border-color: @border; }
 QPushButton:flat { background: transparent; border: none; color: @link; padding: 6px 4px; }
 QPushButton:flat:hover { text-decoration: underline; }
 
@@ -279,17 +285,37 @@ QColor accent() {
     return QColor(QLatin1String(CARDINAL));
 }
 
+void markSecondary(QPushButton *button) {
+    button->setProperty("secondary", true);
+    // Re-apply the style sheet now that the property it matches on is set.
+    button->style()->unpolish(button);
+    button->style()->polish(button);
+}
+
 void setTextRole(QWidget *widget, const char *role) {
     widget->setProperty("textRole", QString::fromLatin1(role));
     widget->style()->unpolish(widget);
     widget->style()->polish(widget);
 }
 
-void markPrimary(QPushButton *button) {
-    button->setProperty("primary", true);
-    // Re-apply the style sheet now that the property it matches on is set.
-    button->style()->unpolish(button);
-    button->style()->polish(button);
+QPixmap scuLogo(const QWidget *widget, int height, const QColor &color) {
+    // A mask: the seal's shape on a transparent background (UI/images/scu-logo.png).
+    const QPixmap mask(QStringLiteral(":/images/scu-logo.png"));
+    if (mask.isNull() || height <= 0) {
+        return {};
+    }
+    const qreal ratio = widget->devicePixelRatioF();
+    QPixmap logo = mask.scaledToHeight(qRound(height * ratio), Qt::SmoothTransformation);
+    QPainter painter(&logo);
+    painter.setCompositionMode(QPainter::CompositionMode_SourceIn);
+    painter.fillRect(logo.rect(), color);
+    painter.end();
+    logo.setDevicePixelRatio(ratio);
+    return logo;
+}
+
+QColor logoColor(const QWidget *widget) {
+    return isDark(widget) ? QColor(QLatin1String(DARK.link)) : accent();
 }
 
 } // namespace AppStyle

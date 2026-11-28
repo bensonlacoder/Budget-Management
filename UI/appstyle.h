@@ -9,6 +9,7 @@
 class QApplication;
 class QColor;
 class QDateEdit;
+class QPixmap;
 class QPushButton;
 class QWidget;
 
@@ -53,8 +54,15 @@ QString noticeBanner(const QWidget *widget);
 void applyTheme(QApplication &app);
 // SCU Cardinal Red, #862633.
 QColor accent();
-// Shows the button as its section's main action: filled in Cardinal Red.
-void markPrimary(QPushButton *button);
+// The SCU seal, `height` pixels tall at the widget's screen resolution, in `color`.
+// Empty if the image can't be loaded.
+QPixmap scuLogo(const QWidget *widget, int height, const QColor &color);
+// The seal's color on the widget's background: Cardinal Red, or a lighter red in dark
+// mode, where Cardinal Red is too dark to see.
+QColor logoColor(const QWidget *widget);
+// Buttons are Cardinal Red. This shows one as clear instead, for the gentler of two
+// choices, such as Decline beside Accept.
+void markSecondary(QPushButton *button);
 // Gives a label a step of the type scale instead of body text. Roles:
 // "headline" (18 pt bold, the page's key figure), "balance" (14 pt bold),
 // "figure" (12 pt bold) and "strong" (bold body text).

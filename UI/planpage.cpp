@@ -140,7 +140,6 @@ PlanPage::PlanPage(const QString &accountName, QWidget *parent)
     reserveEdit->setRange(0.0, LocalAccounts::MaxPurchasePoints);
     reserveEdit->setSuffix(tr(" points"));
     auto *saveButton = new QPushButton(tr("Save reserve"), reserveBox);
-    AppStyle::markPrimary(saveButton);
     saveButton->setObjectName("saveReserveButton");
     auto *reserveRow = new QHBoxLayout;
     reserveRow->addWidget(reserveEdit, 1);

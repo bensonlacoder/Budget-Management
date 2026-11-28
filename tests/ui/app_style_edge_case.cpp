@@ -5,6 +5,7 @@
 #include "appstyle.h"
 
 #include <QDateEdit>
+#include <QPixmap>
 #include <QPalette>
 #include <QWidget>
 
@@ -83,4 +84,18 @@ TEST_CASE("Alerts and notices never share colors") {
         CHECK(AppStyle::alertBanner(&widget) != AppStyle::noticeBanner(&widget));
         CHECK_FALSE(AppStyle::alertBanner(&widget).contains(AppStyle::errorText(&widget)));
     }
+}
+
+TEST_CASE("In dark mode the seal is a lighter red, so it can be seen") {
+    QWidget widget;
+    paint(widget, QColor("#202020"));
+    const QColor color = AppStyle::logoColor(&widget);
+    CHECK(color != AppStyle::accent());
+    CHECK(color.lightness() > AppStyle::accent().lightness());
+}
+
+TEST_CASE("A seal of no height is empty") {
+    QWidget widget;
+    CHECK(AppStyle::scuLogo(&widget, 0, Qt::white).isNull());
+    CHECK(AppStyle::scuLogo(&widget, -5, Qt::white).isNull());
 }

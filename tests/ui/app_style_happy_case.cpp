@@ -1,12 +1,16 @@
 // Shared number, date and color formatting happy case tests (UI/appstyle.h)
 // Original test contributors: Nathan Gu
 // Covers AppStyle::locale, number, points, date, shortDate, time, dateTime,
-// useDateFormat, isDark, errorText, alertBanner and noticeBanner.
+// useDateFormat, isDark, errorText, alertBanner, noticeBanner, applyTheme, accent,
+// markSecondary, setTextRole, scuLogo and logoColor.
 
 #include "doctest.h"
 #include "appstyle.h"
 
 #include <QDateEdit>
+#include <QImage>
+#include <QLabel>
+#include <QPushButton>
 #include <QPalette>
 #include <QWidget>
 
@@ -77,4 +81,52 @@ TEST_CASE("Banners are QLabel stylesheets with text, background and border color
     CHECK(alert.contains("color: #8c1d18"));
     CHECK(alert.contains("border: 1px solid #f2b8b5"));
     CHECK(alert.contains("padding: 8px"));
+}
+
+TEST_CASE("The accent is SCU Cardinal Red") {
+    CHECK(AppStyle::accent() == QColor("#862633"));
+}
+
+TEST_CASE("A secondary button is marked for the clear style") {
+    QPushButton decline("Decline");
+    CHECK_FALSE(decline.property("secondary").toBool());
+    AppStyle::markSecondary(&decline);
+    CHECK(decline.property("secondary").toBool());
+}
+
+TEST_CASE("A text role is set as a property the style sheet uses") {
+    QLabel label("132.80 points");
+    AppStyle::setTextRole(&label, "headline");
+    CHECK(label.property("textRole").toString() == "headline");
+}
+
+TEST_CASE("The SCU seal comes at the asked height in the asked color") {
+    QWidget widget;
+    const QPixmap logo = AppStyle::scuLogo(&widget, 96, Qt::white);
+    REQUIRE_FALSE(logo.isNull());
+    const qreal ratio = widget.devicePixelRatioF();
+    CHECK(logo.height() == qRound(96 * ratio));
+    // Every visible pixel is the asked color; the background stays transparent.
+    const QImage image = logo.toImage();
+    bool sawSeal = false;
+    bool sawClear = false;
+    for (int y = 0; y < image.height(); y += 3) {
+        for (int x = 0; x < image.width(); x += 3) {
+            const QColor pixel = image.pixelColor(x, y);
+            if (pixel.alpha() == 255) {
+                sawSeal = true;
+                CHECK(pixel.rgb() == QColor(Qt::white).rgb());
+            } else if (pixel.alpha() == 0) {
+                sawClear = true;
+            }
+        }
+    }
+    CHECK(sawSeal);
+    CHECK(sawClear);
+}
+
+TEST_CASE("The seal is Cardinal Red on a light window") {
+    QWidget widget;
+    paint(widget, "#f3f3f3");
+    CHECK(AppStyle::logoColor(&widget) == AppStyle::accent());
 }

@@ -82,7 +82,6 @@ ProfilePage::ProfilePage(const QString &accountName, QWidget *parent)
     accountForm->addRow(tr("Display &name:"), displayName);
     accountForm->addRow(tr("&Email:"), email);
     auto *saveProfileButton = button(tr("Save profile"), "saveProfileButton", accountBox);
-    AppStyle::markPrimary(saveProfileButton);
     profileMessage = messageLabel("profileMessage", accountBox);
     accountForm->addRow(QString(), rightAligned(saveProfileButton));
     accountForm->addRow(QString(), profileMessage);
@@ -121,7 +120,6 @@ ProfilePage::ProfilePage(const QString &accountName, QWidget *parent)
     correctionAmount->setDecimals(2);
     correctionAmount->setRange(0.0, LocalAccounts::MaxPurchasePoints);
     auto *correctButton = button(tr("Correct balance"), "correctBalanceButton", balanceBox);
-    AppStyle::markPrimary(correctButton);
     auto *correctionRow = new QHBoxLayout;
     correctionRow->addWidget(correctionMode);
     correctionRow->addWidget(correctionAmount, 1);
@@ -152,7 +150,6 @@ ProfilePage::ProfilePage(const QString &accountName, QWidget *parent)
                                   "goes down by one each day.")
                                    .arg(LocalAccounts::MaxRemainingDays));
     auto *correctDaysButton = button(tr("Correct days"), "correctDaysButton", daysBox);
-    AppStyle::markPrimary(correctDaysButton);
     resetDaysButton = button(tr("Reset days"), "resetDaysButton", daysBox);
     resetDaysButton->setToolTip(tr("Use the days left from the quarter calendar again."));
     auto *daysRow = new QHBoxLayout;
@@ -177,7 +174,6 @@ ProfilePage::ProfilePage(const QString &accountName, QWidget *parent)
     passwordForm->addRow(tr("Confir&m new password:"), confirmPassword);
     auto *changePasswordButton =
         button(tr("Change password"), "changePasswordButton", passwordBox);
-    AppStyle::markPrimary(changePasswordButton);
     passwordMessage = messageLabel("passwordMessage", passwordBox);
     passwordForm->addRow(QString(), rightAligned(changePasswordButton));
     passwordForm->addRow(QString(), passwordMessage);

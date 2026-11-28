@@ -5,4 +5,7 @@
         <file alias="chevron-down.png">icons/chevron-down.png</file>
         <file alias="chevron-down@2x.png">icons/chevron-down@2x.png</file>
     </qresource>
+    <qresource prefix="/images">
+        <file alias="scu-logo.png">images/scu-logo.png</file>
+    </qresource>
 </RCC>

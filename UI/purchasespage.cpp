@@ -24,7 +24,8 @@
 #include <QNetworkReply>
 #include <QNetworkRequest>
 #include <QPushButton>
-#include <QResizeEvent>
+#include <QScrollArea>
+#include <QShowEvent>
 #include <QSignalBlocker>
 #include <QSizePolicy>
 #include <QStyle>
@@ -100,6 +101,7 @@ PurchasesPage::PurchasesPage(const QString &accountName, QWidget *parent)
       choice(new QComboBox(this)), choiceLabel(new QLabel(this)), extras(new QWidget(this)),
       extrasLayout(new QGridLayout(extras)),
       item(new QLineEdit(this)), points(new QDoubleSpinBox(this)), balanceLabel(new QLabel(this)),
+      logo(new QLabel(this)), welcome(new QLabel(this)),
       hoursLabel(new QLabel(this)), menuStatus(new QLabel(this)), feedback(new QLabel(this)),
       historyStatus(new QLabel(this)), history(new QTableWidget(0, 4, this)),
       removePurchase(new QPushButton(tr("Remove selected purchase"), this)),
@@ -163,7 +165,6 @@ PurchasesPage::PurchasesPage(const QString &accountName, QWidget *parent)
     auto *reload = new QPushButton(tr("Refresh hours"), entry);
     auto *save = new QPushButton(tr("Lo&g purchase"), entry);
     save->setObjectName("logPurchaseButton");
-    AppStyle::markPrimary(save);
     save->setAutoDefault(false);
     // Menu links on the left, the form's action on the right, in one row.
     auto *sources = new QHBoxLayout;
@@ -200,24 +201,24 @@ PurchasesPage::PurchasesPage(const QString &accountName, QWidget *parent)
     AppStyle::useDateFormat(filterTo);
     filterFrom->setEnabled(false);
     filterTo->setEnabled(false);
-    // Filters: dates on one row, location and Clear on the next.
-    auto *dateFilter = new QHBoxLayout;
-    dateFilter->addWidget(filterDates);
-    dateFilter->addWidget(filterFrom, 1);
-    dateFilter->addWidget(new QLabel(tr("through"), this));
-    dateFilter->addWidget(filterTo, 1);
-    auto *locationFilter = new QHBoxLayout;
+    // All filters in one row: dates, then location, then Clear.
+    auto *filters = new QHBoxLayout;
+    filters->addWidget(filterDates);
+    filters->addWidget(filterFrom);
+    filters->addWidget(new QLabel(tr("through"), this));
+    filters->addWidget(filterTo);
+    filters->addSpacing(12);
     auto *locationLabel = new QLabel(tr("Location"), this);
     locationLabel->setBuddy(filterLocation);
-    locationFilter->addWidget(locationLabel);
-    locationFilter->addWidget(filterLocation, 1);
+    filters->addWidget(locationLabel);
+    filters->addWidget(filterLocation, 1);
     auto *clear = new QPushButton(tr("Clear filters"), this);
     clear->setObjectName("clearHistoryFilters");
-    locationFilter->addWidget(clear);
-    historyLayout->addLayout(dateFilter);
-    historyLayout->addLayout(locationFilter);
+    filters->addWidget(clear);
+    historyLayout->addLayout(filters);
     historyStatus->setObjectName("historyStatus");
     historyLayout->addWidget(historyStatus);
+    history->setMinimumHeight(HistoryMinimumHeight);
     historyLayout->addWidget(history);
     editEntry->setObjectName("editHistoryButton");
     refundPurchase->setObjectName("linkedRefundButton");
@@ -225,29 +226,47 @@ PurchasesPage::PurchasesPage(const QString &accountName, QWidget *parent)
     refundPurchase->setEnabled(false);
     auto *refund = new QPushButton(tr("Log standalone refund"), this);
     refund->setObjectName("standaloneRefundButton");
-    // Actions on the selected row; below them, the one that needs no selection.
+    // Actions on the selected row on the left; the one that needs no selection apart.
     auto *actions = new QHBoxLayout;
     actions->addWidget(editEntry);
     actions->addWidget(removePurchase);
     actions->addWidget(refundPurchase);
     actions->addStretch();
-    auto *otherActions = new QHBoxLayout;
-    otherActions->addStretch();
-    otherActions->addWidget(refund);
+    actions->addWidget(refund);
     historyLayout->addLayout(actions);
-    historyLayout->addLayout(otherActions);
 
-    // The form keeps its natural height; any extra space goes to the history.
+    // ---- Home header: the SCU logo, a welcome and the balance, centered ----
+    logo->setObjectName("scuLogo");
+    logo->setAlignment(Qt::AlignCenter);
+    logo->setPixmap(AppStyle::scuLogo(this, LogoHeight, AppStyle::logoColor(this)));
+    logo->setAccessibleName(tr("Santa Clara University seal"));
+    welcome->setObjectName("welcomeLabel");
+    welcome->setAlignment(Qt::AlignCenter);
+    AppStyle::setTextRole(welcome, "headline");
+    balanceLabel->setAlignment(Qt::AlignCenter);
+    auto *header = new QVBoxLayout;
+    header->setSpacing(4);
+    header->addWidget(logo);
+    header->addSpacing(8);
+    header->addWidget(welcome);
+    header->addWidget(balanceLabel);
+
+    // Header, then the form, then the history. The page scrolls on short windows so
+    // the history always keeps room for several rows.
     entry->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Maximum);
-    auto *entryColumn = new QVBoxLayout;
-    entryColumn->addWidget(entry);
-    entryColumn->addStretch();
-    columns = new QBoxLayout(QBoxLayout::TopToBottom);
-    columns->addLayout(entryColumn, 2);
-    columns->addWidget(historyGroup, 3);
-    auto *layout = new QVBoxLayout(this);
-    layout->addWidget(balanceLabel);
-    layout->addLayout(columns, 1);
+    auto *content = new QWidget;
+    auto *layout = new QVBoxLayout(content);
+    layout->addLayout(header);
+    layout->addSpacing(8);
+    layout->addWidget(entry);
+    layout->addWidget(historyGroup, 1);
+    auto *scroll = new QScrollArea(this);
+    scroll->setWidgetResizable(true);
+    scroll->setFrameShape(QFrame::NoFrame);
+    scroll->setWidget(content);
+    auto *outer = new QVBoxLayout(this);
+    outer->setContentsMargins(0, 0, 0, 0);
+    outer->addWidget(scroll);
 
     connect(location, &QComboBox::currentTextChanged, this, [this] {
         updateMenuItems();
@@ -284,6 +303,7 @@ PurchasesPage::PurchasesPage(const QString &accountName, QWidget *parent)
     });
     updateMenuItems();
     refreshHistory();
+    refreshWelcome();
     location->setFocus();
     auto *clock = new QTimer(this);
     connect(clock, &QTimer::timeout, this, [this] { refreshHours(); });
@@ -291,12 +311,16 @@ PurchasesPage::PurchasesPage(const QString &accountName, QWidget *parent)
     QTimer::singleShot(0, this, [this] { refreshHours(); });
 }
 
-void PurchasesPage::resizeEvent(QResizeEvent *event) {
-    QWidget::resizeEvent(event);
-    // Side by side when there's room, so the history gets the full height; stacked
-    // on narrow windows.
-    columns->setDirection(width() >= TwoColumnWidth ? QBoxLayout::LeftToRight
-                                                    : QBoxLayout::TopToBottom);
+void PurchasesPage::showEvent(QShowEvent *event) {
+    QWidget::showEvent(event);
+    refreshWelcome(); // The name may have changed on the Profile tab.
+}
+
+void PurchasesPage::refreshWelcome() {
+    LocalAccounts::Profile profile;
+    welcome->setText(LocalAccounts::loadProfile(accountName, profile)
+                         ? tr("Welcome back, %1").arg(profile.displayName)
+                         : tr("Welcome back"));
 }
 
 void PurchasesPage::showFeedback(const QString &text) {

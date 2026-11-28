@@ -122,7 +122,6 @@ AuthDialog::AuthDialog(QWidget *parent)
     form->addRow(tr("Con&firm password"), confirmation);
 
     submitButton->setDefault(true);
-    AppStyle::markPrimary(submitButton);
     for (auto *button : {switchButton, codeButton, forgotButton}) {
         button->setAutoDefault(false);
     }
@@ -137,6 +136,10 @@ AuthDialog::AuthDialog(QWidget *parent)
     auto *brand = new QFrame(this);
     brand->setObjectName("brandPanel");
     brand->setFixedWidth(230);
+    auto *seal = new QLabel(brand);
+    seal->setObjectName("brandLogo");
+    seal->setPixmap(AppStyle::scuLogo(this, 88, Qt::white));
+    seal->setAccessibleName(tr("Santa Clara University seal"));
     auto *appName = new QLabel(tr("Dining Points Budget"), brand);
     appName->setWordWrap(true);
     QFont nameFont = appName->font();
@@ -149,6 +152,8 @@ AuthDialog::AuthDialog(QWidget *parent)
     auto *brandLayout = new QVBoxLayout(brand);
     brandLayout->setContentsMargins(24, 28, 24, 28);
     brandLayout->setSpacing(10);
+    brandLayout->addWidget(seal);
+    brandLayout->addSpacing(8);
     brandLayout->addWidget(appName);
     brandLayout->addWidget(tagline);
     brandLayout->addStretch();
