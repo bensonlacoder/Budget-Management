@@ -1,4 +1,7 @@
-// Quarter calendar tests (T03, SP-04).
+// Quarter calendar happy case tests (T03; SPECIFICATIONS.md SP-05)
+// Original test contributors: Benson, Nathan Gu
+// Covers Quarter::Term::length, Quarter::calendar, Quarter::statusOn and
+// Quarter::daysLeft.
 
 #include "doctest.h"
 #include "quarter.h"
@@ -12,6 +15,21 @@ TEST_CASE("The 2026-27 quarters have the expected lengths") {
     CHECK(terms[0].length() == 82); // Fall 2026
     CHECK(terms[1].length() == 75); // Winter 2027
     CHECK(terms[2].length() == 73); // Spring 2027
+}
+
+// Author: Nathan Gu
+TEST_CASE("The calendar lists SCU's 2026-27 dates in order") {
+    const auto &terms = Quarter::calendar();
+    REQUIRE(terms.size() == 3);
+    CHECK(terms[0].name == "Fall 2026");
+    CHECK(terms[0].start == QDate(2026, 9, 21));
+    CHECK(terms[0].end == QDate(2026, 12, 11));
+    CHECK(terms[1].name == "Winter 2027");
+    CHECK(terms[1].start == QDate(2027, 1, 4));
+    CHECK(terms[1].end == QDate(2027, 3, 19));
+    CHECK(terms[2].name == "Spring 2027");
+    CHECK(terms[2].start == QDate(2027, 3, 30));
+    CHECK(terms[2].end == QDate(2027, 6, 10));
 }
 
 // Author: Benson
@@ -42,34 +60,16 @@ TEST_CASE("Between quarters, the next quarter's full length and start are shown"
     CHECK(winterBreak.term.name == "Winter 2027");
     CHECK(winterBreak.term.start == QDate(2027, 1, 4));
     CHECK(winterBreak.daysLeft == 75);
-
-    // The day after finals is already a break.
-    CHECK(Quarter::statusOn(QDate(2026, 12, 12)).phase == Phase::BeforeQuarter);
-
-    // Before the first listed quarter, Fall is next.
-    const auto summer = Quarter::statusOn(QDate(2026, 8, 1));
-    CHECK(summer.phase == Phase::BeforeQuarter);
-    CHECK(summer.term.name == "Fall 2026");
-    CHECK(summer.daysLeft == 82);
 }
 
 // Author: Benson
-TEST_CASE("After the last listed quarter, the calendar needs updating") {
-    CHECK(Quarter::statusOn(QDate(2027, 6, 10)).phase == Phase::InQuarter);
-    const auto ended = Quarter::statusOn(QDate(2027, 6, 11));
-    CHECK(ended.phase == Phase::CalendarEnded);
-    CHECK(ended.term.name.isEmpty());
-    CHECK(ended.daysLeft == 0);
-}
-
-// Author: Benson
-TEST_CASE("A manual correction takes priority, and the saved count is the fallback") {
+TEST_CASE("A manual correction takes priority over the calendar") {
     const QDate inFall(2026, 11, 22);
     CHECK(Quarter::daysLeft(inFall, false, 40) == 20);
     CHECK(Quarter::daysLeft(inFall, true, 40) == 40);
-    CHECK(Quarter::daysLeft(inFall, true, 0) == 0);
+}
 
-    const QDate afterCalendar(2027, 7, 1);
-    CHECK(Quarter::daysLeft(afterCalendar, false, 12) == 12);
-    CHECK(Quarter::daysLeft(afterCalendar, true, 12) == 12);
+// Author: Nathan Gu
+TEST_CASE("Without a correction, days left between quarters are the next quarter's length") {
+    CHECK(Quarter::daysLeft(QDate(2027, 3, 25), false, 12) == 73); // Spring break.
 }

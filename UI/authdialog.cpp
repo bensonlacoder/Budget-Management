@@ -1,22 +1,21 @@
 #include "authdialog.h"
+#include "appstyle.h"
 
 #include <QAction>
 #include <QComboBox>
 #include <QFont>
 #include <QFormLayout>
+#include <QFrame>
 #include <QGuiApplication>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
 #include <QLocale>
-#include <QMainWindow>
-#include <QMenu>
 #include <QPainter>
 #include <QPainterPath>
 #include <QPixmap>
 #include <QPushButton>
 #include <QSignalBlocker>
-#include <QStatusBar>
 #include <QVBoxLayout>
 
 using LocalAccounts::Result;
@@ -77,7 +76,7 @@ AuthDialog::AuthDialog(QWidget *parent)
       switchButton(new QPushButton(this)), codeButton(new QPushButton(this)),
       forgotButton(new QPushButton(tr("&Forgot password?"), this)) {
     setWindowTitle(tr("Dining Points Budget"));
-    setMinimumWidth(420);
+    setMinimumWidth(680);
 
     QFont headingFont = heading->font();
     headingFont.setPointSize(18);
@@ -133,13 +132,46 @@ AuthDialog::AuthDialog(QWidget *parent)
     buttons->addWidget(codeButton);
     buttons->addWidget(submitButton);
 
-    auto *layout = new QVBoxLayout(this);
-    layout->setContentsMargins(20, 20, 20, 20);
-    layout->setSpacing(12);
+    // Brand panel on the left: the app's name and what it's for.
+    auto *brand = new QFrame(this);
+    brand->setObjectName("brandPanel");
+    brand->setFixedWidth(230);
+    auto *seal = new QLabel(brand);
+    seal->setObjectName("brandLogo");
+    seal->setPixmap(AppStyle::scuLogo(this, 88, Qt::white));
+    seal->setAccessibleName(tr("Santa Clara University seal"));
+    auto *appName = new QLabel(tr("Dining Points Budget"), brand);
+    appName->setWordWrap(true);
+    QFont nameFont = appName->font();
+    nameFont.setPointSize(20);
+    nameFont.setBold(true);
+    appName->setFont(nameFont);
+    auto *tagline = new QLabel(
+        tr("Plan your SCU dining points so they last the whole quarter."), brand);
+    tagline->setWordWrap(true);
+    auto *brandLayout = new QVBoxLayout(brand);
+    brandLayout->setContentsMargins(24, 28, 24, 28);
+    brandLayout->setSpacing(10);
+    brandLayout->addWidget(seal);
+    brandLayout->addSpacing(8);
+    brandLayout->addWidget(appName);
+    brandLayout->addWidget(tagline);
+    brandLayout->addStretch();
+
+    auto *layout = new QVBoxLayout;
+    layout->setContentsMargins(28, 28, 28, 24);
+    layout->setSpacing(14);
     layout->addWidget(heading);
     layout->addLayout(form);
     layout->addWidget(message);
+    layout->addStretch();
     layout->addLayout(buttons);
+
+    auto *outer = new QHBoxLayout(this);
+    outer->setContentsMargins(0, 0, 0, 0);
+    outer->setSpacing(0);
+    outer->addWidget(brand);
+    outer->addLayout(layout, 1);
 
     connect(submitButton, &QPushButton::clicked, this, &AuthDialog::submit);
     connect(codeButton, &QPushButton::clicked, this, &AuthDialog::sendCode);
@@ -450,27 +482,4 @@ void AuthDialog::showError(Result result) {
         message->setText(tr("Could not open the account database. Try again."));
         break;
     }
-}
-
-QAction *addTwoStepSignInAction(QMenu *menu, QMainWindow *window, const QString &account,
-                                bool enabled) {
-    auto *action = menu->addAction(QObject::tr("&Two-step sign-in"));
-    action->setObjectName("twoStepSignInAction");
-    action->setCheckable(true);
-    action->setChecked(enabled);
-    action->setToolTip(QObject::tr("Also ask for a code sent to your email each time you sign in"));
-    QObject::connect(action, &QAction::toggled, window, [action, window, account](bool on) {
-        if (LocalAccounts::setTwoStepSignIn(account, on) != Result::Success) {
-            const QSignalBlocker blocker(action); // Undo the check mark without saving again.
-            action->setChecked(!on);
-            window->statusBar()->showMessage(
-                QObject::tr("Couldn't change two-step sign-in. Try again."));
-            return;
-        }
-        window->statusBar()->showMessage(
-            on ? QObject::tr("Two-step sign-in is on. Each time you sign in, also enter the code "
-                             "we email you.")
-               : QObject::tr("Two-step sign-in is off. You'll sign in with just your password."));
-    });
-    return action;
 }

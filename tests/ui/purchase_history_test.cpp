@@ -1,4 +1,5 @@
 #include "doctest.h"
+#include "appstyle.h"
 #include "purchasespage.h"
 #include "quarter.h"
 #include "test_account_store.h"
@@ -209,4 +210,30 @@ TEST_CASE("A linked refund's date can't be set before its purchase") {
     });
     page.findChild<QPushButton *>("linkedRefundButton")->click();
     CHECK(earliest == bought);
+}
+
+// Author: Nathan Gu
+TEST_CASE("showBalance shows the balance and reloads the history") {
+    TestAccountStore store;
+    const auto profile = store.createVerified("show-balance@example.com", "Student");
+    PurchasesPage page(profile.accountId);
+    auto *label = page.findChild<QLabel *>("purchaseBalance");
+    auto *table = page.findChild<QTableWidget *>("purchaseHistory");
+    REQUIRE(label);
+    REQUIRE(table);
+    CHECK(table->rowCount() == 0);
+
+    // A purchase saved elsewhere appears once the page is told the new balance.
+    double balance = 0.0;
+    REQUIRE(LocalAccounts::recordPurchase(profile.accountId,
+                                          {QDate::currentDate(), "A", "Tea", 3}, balance)
+            == Result::Success);
+    page.showBalance(balance);
+    CHECK(label->text() == QString("Balance: %1 points").arg(AppStyle::number(balance)));
+    CHECK(table->rowCount() == 1);
+
+    page.showBalance(2192.5);
+    CHECK(label->text() == "Balance: 2,192.50 points");
+    page.showBalance(0.0);
+    CHECK(label->text() == "Balance: 0.00 points");
 }

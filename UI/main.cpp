@@ -1,24 +1,26 @@
+#include "appstyle.h"
 #include "authdialog.h"
 #include "chartspage.h"
-#include "friendsdialog.h"
+#include "friendspage.h"
 #include "mainui.h"
-#include "menusearchdialog.h"
 #include "planpage.h"
 #include "profilepage.h"
 #include "purchasespage.h"
 
-#include <QAction>
 #include <QApplication>
-#include <QMenu>
-#include <QMenuBar>
 #include <QMessageBox>
+#include <QScreen>
 
+#include <algorithm>
 #include <optional>
 
 int main(int argc, char *argv[]) {
     QApplication app(argc, argv);
     app.setApplicationName("DiningPointsBudget");
     app.setApplicationDisplayName(QObject::tr("Dining Points Budget"));
+    // Numbers, dates and number fields read the same on every computer (AppStyle).
+    QLocale::setDefault(AppStyle::locale());
+    AppStyle::applyTheme(app);
 
     AuthDialog auth;
     auth.setAttribute(Qt::WA_QuitOnClose, false);
@@ -49,8 +51,10 @@ int main(int argc, char *argv[]) {
             box->setModal(false);
             box->show();
         });
+        auto *friendsPage = new FriendsPage(accountName, profile.friendId, window);
         window->addPage(plan, QObject::tr("P&lan"));
         window->addPage(charts, QObject::tr("&Charts"));
+        window->addPage(friendsPage, QObject::tr("&Friends"));
         window->addPage(profilePage, QObject::tr("P&rofile"));
 
         // Keep every page showing the real balance after a change on another tab.
@@ -63,30 +67,17 @@ int main(int argc, char *argv[]) {
         QObject::connect(profilePage, &ProfilePage::balanceUpdated, plan, &PlanPage::refresh);
         QObject::connect(profilePage, &ProfilePage::balanceUpdated, charts, &ChartsPage::refresh);
         QObject::connect(profilePage, &ProfilePage::daysUpdated, plan, &PlanPage::refresh);
-        auto *accountMenu = window->menuBar()->addMenu(QObject::tr("&Account"));
-        auto *friends = accountMenu->addAction(QObject::tr("&Friends"));
-        QObject::connect(friends, &QAction::triggered, window,
-                         [window, accountName, friendId = profile.friendId] {
-            auto *dialog = new FriendsDialog(accountName, friendId, window);
-            dialog->setAttribute(Qt::WA_DeleteOnClose);
-            dialog->setWindowModality(Qt::WindowModal);
-            dialog->show();
-        });
-        auto *menus = window->menuBar()->addMenu(QObject::tr("&Menus"));
-        auto *findMeals = menus->addAction(QObject::tr("&Find meals..."));
-        QObject::connect(findMeals, &QAction::triggered, window, [window, accountName] {
-            auto *dialog = new MenuSearchDialog(accountName, window);
-            dialog->setAttribute(Qt::WA_DeleteOnClose);
-            dialog->show();
-        });
-        addTwoStepSignInAction(accountMenu, window, accountName, profile.twoStepSignIn);
-        auto *signOut = accountMenu->addAction(QObject::tr("Sign &out"));
-        QObject::connect(signOut, &QAction::triggered, window, [&auth, window] {
+        QObject::connect(profilePage, &ProfilePage::signOutRequested, window, [&auth, window] {
             auth.reset();
             auth.show();
             window->hide();
             window->deleteLater();
         });
+        // A comfortable size on a laptop, but never larger than the screen allows,
+        // for example at 125% or 150% display scaling.
+        const QRect screen = window->screen()->availableGeometry();
+        window->resize(std::min(960, screen.width() * 9 / 10),
+                       std::min(720, screen.height() * 9 / 10));
         window->show();
     });
     auth.show();

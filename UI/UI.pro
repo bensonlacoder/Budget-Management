@@ -13,11 +13,10 @@ SOURCES += \
     authdialog.cpp \
     chartspage.cpp \
     emailsender.cpp \
-    friendsdialog.cpp \
+    friendspage.cpp \
     localaccounts.cpp \
     main.cpp \
     mainui.cpp \
-    menusearchdialog.cpp \
     planpage.cpp \
     profilepage.cpp \
     purchasespage.cpp \
@@ -33,10 +32,9 @@ HEADERS += \
     authdialog.h \
     chartspage.h \
     emailsender.h \
-    friendsdialog.h \
+    friendspage.h \
     localaccounts.h \
     mainui.h \
-    menusearchdialog.h \
     planpage.h \
     profilepage.h \
     purchasespage.h \
@@ -44,6 +42,9 @@ HEADERS += \
 
 FORMS += \
     mainui.ui
+
+RESOURCES += \
+    resources.qrc
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin

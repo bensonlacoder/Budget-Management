@@ -10,8 +10,6 @@ class QComboBox;
 class QFormLayout;
 class QLabel;
 class QLineEdit;
-class QMainWindow;
-class QMenu;
 class QPushButton;
 
 // Sign in, create an account, verify its email with a code, or reset a forgotten
@@ -64,11 +62,5 @@ private:
     QString pendingPassword;
     LocalAccounts::Profile signedInProfile;
 };
-
-// Adds a checkable "Two-step sign-in" item to `menu` for the signed-in account. Each
-// change is saved at once and confirmed in the window's status bar; if it can't be
-// saved, the item goes back to its previous state.
-QAction *addTwoStepSignInAction(QMenu *menu, QMainWindow *window, const QString &account,
-                                bool enabled);
 
 #endif // AUTHDIALOG_H

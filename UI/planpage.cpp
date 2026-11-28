@@ -36,24 +36,12 @@ QLabel *namedLabel(const char *name, QWidget *parent, bool bold = false) {
     label->setObjectName(QLatin1String(name));
     label->setWordWrap(true);
     if (bold) {
-        QFont font = label->font();
-        font.setBold(true);
-        label->setFont(font);
+        AppStyle::setTextRole(label, "strong");
     }
     return label;
 }
 
-// Point sizes for the Plan tab's figures. The headline matches the Budget tab's
-// heading (18); the other limits stay a clear step below it.
-constexpr int HEADLINE_POINTS = 18;
-constexpr int FIGURE_POINTS = 12;
 constexpr int GROUP_SPACING = 10;
-
-QFont sizedFont(QFont font, int points, bool bold) {
-    font.setPointSize(points);
-    font.setBold(bold);
-    return font;
-}
 
 // A caption above a figure.
 QLabel *captionLabel(const QString &text, QWidget *parent) {
@@ -80,7 +68,7 @@ PlanPage::PlanPage(const QString &accountName, QWidget *parent)
     auto *adviceBox = new QGroupBox(tr("Your spending plan"), content);
     auto *adviceLayout = new QVBoxLayout(adviceBox);
     dailyLabel = namedLabel("dailyBudgetLabel", adviceBox);
-    dailyLabel->setFont(sizedFont(dailyLabel->font(), HEADLINE_POINTS, true));
+    AppStyle::setTextRole(dailyLabel, "headline");
     dailyLabel->setWordWrap(false);
     auto *headline = new QHBoxLayout;
     headline->addWidget(new QLabel(tr("Spend up to"), adviceBox), 0, Qt::AlignBaseline);
@@ -103,7 +91,7 @@ PlanPage::PlanPage(const QString &accountName, QWidget *parent)
     };
     int column = 0;
     for (const auto &[caption, value] : limitCells) {
-        value->setFont(sizedFont(value->font(), FIGURE_POINTS, true));
+        AppStyle::setTextRole(value, "figure");
         limits->addWidget(captionLabel(caption, adviceBox), 0, column);
         limits->addWidget(value, 1, column);
         limits->setColumnStretch(column, 1);
@@ -176,7 +164,7 @@ PlanPage::PlanPage(const QString &accountName, QWidget *parent)
     habitsHelp->setWordWrap(true);
     habitsLayout->addWidget(habitsHelp);
     const QStringList dayNames = {tr("Mo&n"), tr("Tu&e"), tr("&Wed"), tr("T&hu"),
-                                  tr("&Fri"), tr("&Sat"), tr("S&un")};
+                                  tr("Fr&i"), tr("&Sat"), tr("S&un")};
     const QStringList fullDayNames = {tr("Monday"), tr("Tuesday"), tr("Wednesday"),
                                       tr("Thursday"), tr("Friday"), tr("Saturday"),
                                       tr("Sunday")};

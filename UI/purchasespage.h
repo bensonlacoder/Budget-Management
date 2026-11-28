@@ -18,6 +18,7 @@ class QLabel;
 class QLineEdit;
 class QNetworkAccessManager;
 class QPushButton;
+class QShowEvent;
 class QTableWidget;
 
 class PurchasesPage : public QWidget {
@@ -27,8 +28,15 @@ public:
     explicit PurchasesPage(const QString &accountName, QWidget *parent = nullptr);
     void showBalance(double balance);
 
+    static constexpr int LogoHeight = 96;
+    // Enough for about six rows; the page scrolls on shorter windows.
+    static constexpr int HistoryMinimumHeight = 240;
+
 signals:
     void balanceUpdated(double newBalance);
+
+protected:
+    void showEvent(QShowEvent *event) override;
 
 private:
     void updateMenuItems();
@@ -42,6 +50,8 @@ private:
     void recordPurchase();
     // Sets the message under the form, which takes space only when it has text.
     void showFeedback(const QString &text);
+    // "Welcome back, <display name>" in the header.
+    void refreshWelcome();
     void removeSelectedEntry();
     void editSelectedEntry();
     void refundSelectedPurchase();
@@ -64,6 +74,8 @@ private:
     QLineEdit *item;
     QDoubleSpinBox *points;
     QLabel *balanceLabel;
+    QLabel *logo;
+    QLabel *welcome;
     QLabel *hoursLabel;
     QLabel *menuStatus;
     QLabel *feedback;

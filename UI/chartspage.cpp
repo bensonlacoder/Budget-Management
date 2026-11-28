@@ -139,7 +139,7 @@ ChartsPage::ChartsPage(const QString &accountName, QWidget *parent)
     period->addItems({tr("Daily"), tr("Weekly")});
 
     auto *filter = new QHBoxLayout;
-    auto *fromLabel = new QLabel(tr("&From"), this);
+    auto *fromLabel = new QLabel(tr("Fro&m"), this);
     fromLabel->setBuddy(from);
     auto *toLabel = new QLabel(tr("&Through"), this);
     toLabel->setBuddy(to);

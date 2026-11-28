@@ -3,6 +3,7 @@
 
 #include "quarter.h"
 
+#include <QCheckBox>
 #include <QClipboard>
 #include <QComboBox>
 #include <QDoubleSpinBox>
@@ -15,6 +16,7 @@
 #include <QLocale>
 #include <QPushButton>
 #include <QScrollArea>
+#include <QSignalBlocker>
 #include <QSpinBox>
 #include <QTimer>
 #include <QVBoxLayout>
@@ -37,6 +39,7 @@ QLabel *messageLabel(const char *name, QWidget *parent) {
     auto *label = new QLabel(parent);
     label->setObjectName(QLatin1String(name));
     label->setWordWrap(true);
+    label->hide(); // Takes space only once showMessage() gives it text.
     return label;
 }
 
@@ -44,6 +47,14 @@ QPushButton *button(const QString &text, const char *name, QWidget *parent) {
     auto *result = new QPushButton(text, parent);
     result->setObjectName(QLatin1String(name));
     return result;
+}
+
+// A row holding just `button`, at its normal width on the right.
+QHBoxLayout *rightAligned(QPushButton *button) {
+    auto *row = new QHBoxLayout;
+    row->addStretch();
+    row->addWidget(button);
+    return row;
 }
 
 QLineEdit *passwordEdit(const char *name, QWidget *parent) {
@@ -72,7 +83,7 @@ ProfilePage::ProfilePage(const QString &accountName, QWidget *parent)
     accountForm->addRow(tr("&Email:"), email);
     auto *saveProfileButton = button(tr("Save profile"), "saveProfileButton", accountBox);
     profileMessage = messageLabel("profileMessage", accountBox);
-    accountForm->addRow(QString(), saveProfileButton);
+    accountForm->addRow(QString(), rightAligned(saveProfileButton));
     accountForm->addRow(QString(), profileMessage);
 
     friendId = new QLabel(accountBox);
@@ -94,9 +105,7 @@ ProfilePage::ProfilePage(const QString &accountName, QWidget *parent)
     auto *balanceForm = new QFormLayout(balanceBox);
     balance = new QLabel(balanceBox);
     balance->setObjectName("balanceLabel");
-    QFont bold = balance->font();
-    bold.setBold(true);
-    balance->setFont(bold);
+    AppStyle::setTextRole(balance, "strong");
     balanceForm->addRow(tr("Points left:"), balance);
     lastUpdated = new QLabel(balanceBox);
     lastUpdated->setObjectName("lastUpdatedLabel");
@@ -128,7 +137,7 @@ ProfilePage::ProfilePage(const QString &accountName, QWidget *parent)
     auto *daysForm = new QFormLayout(daysBox);
     days = new QLabel(daysBox);
     days->setObjectName("daysLabel");
-    days->setFont(bold);
+    AppStyle::setTextRole(days, "strong");
     daysForm->addRow(tr("Days left (including today):"), days);
     quarter = new QLabel(daysBox);
     quarter->setObjectName("quarterLabel");
@@ -162,13 +171,30 @@ ProfilePage::ProfilePage(const QString &accountName, QWidget *parent)
     confirmPassword = passwordEdit("confirmPasswordEdit", passwordBox);
     passwordForm->addRow(tr("C&urrent password:"), currentPassword);
     passwordForm->addRow(tr("Ne&w password:"), newPassword);
-    passwordForm->addRow(tr("Con&firm new password:"), confirmPassword);
+    passwordForm->addRow(tr("Confir&m new password:"), confirmPassword);
     auto *changePasswordButton =
         button(tr("Change password"), "changePasswordButton", passwordBox);
     passwordMessage = messageLabel("passwordMessage", passwordBox);
-    passwordForm->addRow(QString(), changePasswordButton);
+    passwordForm->addRow(QString(), rightAligned(changePasswordButton));
     passwordForm->addRow(QString(), passwordMessage);
     layout->addWidget(passwordBox);
+
+    // ---- Sign-in ----
+    auto *signInBox = new QGroupBox(tr("Sign-in"), content);
+    auto *signInLayout = new QVBoxLayout(signInBox);
+    twoStepSignIn = new QCheckBox(
+        tr("Two-step sign-&in: also ask for a code sent to my email each time I sign in"),
+        signInBox);
+    twoStepSignIn->setObjectName("twoStepSignInCheckBox");
+    signInMessage = messageLabel("signInMessage", signInBox);
+    auto *signOutButton = button(tr("Sign &out"), "signOutButton", signInBox);
+    auto *signOutRow = new QHBoxLayout;
+    signOutRow->addStretch();
+    signOutRow->addWidget(signOutButton);
+    signInLayout->addWidget(twoStepSignIn);
+    signInLayout->addWidget(signInMessage);
+    signInLayout->addLayout(signOutRow);
+    layout->addWidget(signInBox);
     layout->addStretch();
 
     auto *scroll = new QScrollArea(this);
@@ -185,6 +211,8 @@ ProfilePage::ProfilePage(const QString &accountName, QWidget *parent)
     connect(correctDaysButton, &QPushButton::clicked, this, &ProfilePage::correctDays);
     connect(resetDaysButton, &QPushButton::clicked, this, &ProfilePage::resetDays);
     connect(changePasswordButton, &QPushButton::clicked, this, &ProfilePage::changePassword);
+    connect(twoStepSignIn, &QCheckBox::toggled, this, &ProfilePage::setTwoStepSignIn);
+    connect(signOutButton, &QPushButton::clicked, this, &ProfilePage::signOutRequested);
 
     refresh();
     loadEditors();
@@ -214,6 +242,10 @@ void ProfilePage::refresh() {
     profile = loaded;
 
     friendId->setText(profile.friendId);
+    {
+        const QSignalBlocker quiet(twoStepSignIn); // Showing the saved choice saves nothing.
+        twoStepSignIn->setChecked(profile.twoStepSignIn);
+    }
     QString planName = profile.diningPlanId;
     for (const auto &plan : LocalAccounts::diningPlans()) {
         if (plan.id == profile.diningPlanId) {
@@ -366,9 +398,25 @@ void ProfilePage::changePassword() {
     }
 }
 
+void ProfilePage::setTwoStepSignIn(bool on) {
+    if (LocalAccounts::setTwoStepSignIn(accountName, on) != Result::Success) {
+        const QSignalBlocker quiet(twoStepSignIn); // Undo the check without saving again.
+        twoStepSignIn->setChecked(!on);
+        showMessage(signInMessage, tr("Couldn't change two-step sign-in. Try again."), true);
+        return;
+    }
+    profile.twoStepSignIn = on;
+    showMessage(signInMessage,
+                on ? tr("Two-step sign-in is on. Each time you sign in, also enter the code "
+                        "we email you.")
+                   : tr("Two-step sign-in is off. You'll sign in with just your password."),
+                false);
+}
+
 void ProfilePage::showMessage(QLabel *label, const QString &text, bool error) {
     label->setStyleSheet(error ? AppStyle::errorText(label) : QString());
     label->setText(text);
+    label->setVisible(!text.isEmpty());
 }
 
 QString ProfilePage::formatPoints(double points) {

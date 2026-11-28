@@ -24,6 +24,8 @@
 #include <QNetworkReply>
 #include <QNetworkRequest>
 #include <QPushButton>
+#include <QScrollArea>
+#include <QShowEvent>
 #include <QSignalBlocker>
 #include <QSizePolicy>
 #include <QStyle>
@@ -99,6 +101,7 @@ PurchasesPage::PurchasesPage(const QString &accountName, QWidget *parent)
       choice(new QComboBox(this)), choiceLabel(new QLabel(this)), extras(new QWidget(this)),
       extrasLayout(new QGridLayout(extras)),
       item(new QLineEdit(this)), points(new QDoubleSpinBox(this)), balanceLabel(new QLabel(this)),
+      logo(new QLabel(this)), welcome(new QLabel(this)),
       hoursLabel(new QLabel(this)), menuStatus(new QLabel(this)), feedback(new QLabel(this)),
       historyStatus(new QLabel(this)), history(new QTableWidget(0, 4, this)),
       removePurchase(new QPushButton(tr("Remove selected purchase"), this)),
@@ -109,10 +112,7 @@ PurchasesPage::PurchasesPage(const QString &accountName, QWidget *parent)
       filterTo(new QDateEdit(QDate::currentDate(), this)),
       filterLocation(new QComboBox(this)),
       network(new QNetworkAccessManager(this)) {
-    QFont balanceFont = balanceLabel->font();
-    balanceFont.setPointSize(14);
-    balanceFont.setBold(true);
-    balanceLabel->setFont(balanceFont);
+    AppStyle::setTextRole(balanceLabel, "balance");
     balanceLabel->setObjectName("purchaseBalance");
 
     date->setObjectName("purchaseDate");
@@ -218,6 +218,7 @@ PurchasesPage::PurchasesPage(const QString &accountName, QWidget *parent)
     historyLayout->addLayout(filters);
     historyStatus->setObjectName("historyStatus");
     historyLayout->addWidget(historyStatus);
+    history->setMinimumHeight(HistoryMinimumHeight);
     historyLayout->addWidget(history);
     editEntry->setObjectName("editHistoryButton");
     refundPurchase->setObjectName("linkedRefundButton");
@@ -234,12 +235,38 @@ PurchasesPage::PurchasesPage(const QString &accountName, QWidget *parent)
     actions->addWidget(refund);
     historyLayout->addLayout(actions);
 
-    auto *layout = new QVBoxLayout(this);
-    layout->addWidget(balanceLabel);
-    // The form keeps its natural height; any extra space goes to the history.
+    // ---- Home header: the SCU logo, a welcome and the balance, centered ----
+    logo->setObjectName("scuLogo");
+    logo->setAlignment(Qt::AlignCenter);
+    logo->setPixmap(AppStyle::scuLogo(this, LogoHeight, AppStyle::logoColor(this)));
+    logo->setAccessibleName(tr("Santa Clara University seal"));
+    welcome->setObjectName("welcomeLabel");
+    welcome->setAlignment(Qt::AlignCenter);
+    AppStyle::setTextRole(welcome, "headline");
+    balanceLabel->setAlignment(Qt::AlignCenter);
+    auto *header = new QVBoxLayout;
+    header->setSpacing(4);
+    header->addWidget(logo);
+    header->addSpacing(8);
+    header->addWidget(welcome);
+    header->addWidget(balanceLabel);
+
+    // Header, then the form, then the history. The page scrolls on short windows so
+    // the history always keeps room for several rows.
     entry->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Maximum);
+    auto *content = new QWidget;
+    auto *layout = new QVBoxLayout(content);
+    layout->addLayout(header);
+    layout->addSpacing(8);
     layout->addWidget(entry);
     layout->addWidget(historyGroup, 1);
+    auto *scroll = new QScrollArea(this);
+    scroll->setWidgetResizable(true);
+    scroll->setFrameShape(QFrame::NoFrame);
+    scroll->setWidget(content);
+    auto *outer = new QVBoxLayout(this);
+    outer->setContentsMargins(0, 0, 0, 0);
+    outer->addWidget(scroll);
 
     connect(location, &QComboBox::currentTextChanged, this, [this] {
         updateMenuItems();
@@ -276,11 +303,24 @@ PurchasesPage::PurchasesPage(const QString &accountName, QWidget *parent)
     });
     updateMenuItems();
     refreshHistory();
+    refreshWelcome();
     location->setFocus();
     auto *clock = new QTimer(this);
     connect(clock, &QTimer::timeout, this, [this] { refreshHours(); });
     clock->start(60000);
     QTimer::singleShot(0, this, [this] { refreshHours(); });
+}
+
+void PurchasesPage::showEvent(QShowEvent *event) {
+    QWidget::showEvent(event);
+    refreshWelcome(); // The name may have changed on the Profile tab.
+}
+
+void PurchasesPage::refreshWelcome() {
+    LocalAccounts::Profile profile;
+    welcome->setText(LocalAccounts::loadProfile(accountName, profile)
+                         ? tr("Welcome back, %1").arg(profile.displayName)
+                         : tr("Welcome back"));
 }
 
 void PurchasesPage::showFeedback(const QString &text) {
@@ -401,8 +441,8 @@ QString PurchasesPage::hoursText(const ScuMenu::Schedule &schedule, QTime now) c
 
     QStringList hours;
     for (const auto &window : schedule.hours) {
-        const QString range = tr("%1 to %2").arg(AppStyle::locale().toString(window.opens, QLocale::ShortFormat),
-                                                  AppStyle::locale().toString(window.closes, QLocale::ShortFormat));
+        const QString range = tr("%1 to %2").arg(AppStyle::time(window.opens),
+                                                  AppStyle::time(window.closes));
         if (!hours.contains(range)) {
             hours.append(range);
         }

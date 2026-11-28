@@ -1,4 +1,4 @@
-#include "friendsdialog.h"
+#include "friendspage.h"
 #include "appstyle.h"
 #include "localaccounts.h"
 
@@ -12,17 +12,16 @@
 #include <QListWidget>
 #include <QMessageBox>
 #include <QPushButton>
+#include <QShowEvent>
 #include <QTableWidget>
 #include <QVBoxLayout>
 
-FriendsDialog::FriendsDialog(const QString &accountName, const QString &friendId, QWidget *parent)
-    : QDialog(parent), accountName(accountName), requestId(new QLineEdit(this)),
+FriendsPage::FriendsPage(const QString &accountName, const QString &friendId, QWidget *parent)
+    : QWidget(parent), accountName(accountName), requestId(new QLineEdit(this)),
       status(new QLabel(this)), requests(new QListWidget(this)), sent(new QListWidget(this)),
       friends(new QTableWidget(0, 3, this)), noRequests(new QLabel(tr("No incoming requests."))),
       noSent(new QLabel(tr("No sent requests are waiting for an answer."))),
       noFriends(new QLabel(tr("No friends yet."))) {
-    setWindowTitle(tr("Friends"));
-    resize(560, 640);
     status->setObjectName("friendsStatus");
     noSent->setObjectName("noSentRequests");
     status->setWordWrap(true);
@@ -31,7 +30,7 @@ FriendsDialog::FriendsDialog(const QString &accountName, const QString &friendId
     ownId->setReadOnly(true);
     ownId->setObjectName("ownFriendId");
     requestId->setObjectName("requestFriendId");
-    auto *copy = new QPushButton(tr("&Copy ID"), this);
+    auto *copy = new QPushButton(tr("C&opy ID"), this);
     auto *send = new QPushButton(tr("&Send request"), this);
     auto *idRow = new QHBoxLayout;
     idRow->addWidget(ownId);
@@ -42,7 +41,7 @@ FriendsDialog::FriendsDialog(const QString &accountName, const QString &friendId
     auto *form = new QFormLayout;
     auto *ownIdLabel = new QLabel(tr("&Your friend ID"), this);
     ownIdLabel->setBuddy(ownId);
-    auto *requestLabel = new QLabel(tr("&Friend's ID"), this);
+    auto *requestLabel = new QLabel(tr("Friend's I&D"), this);
     requestLabel->setBuddy(requestId);
     form->addRow(ownIdLabel, idRow);
     form->addRow(requestLabel, requestRow);
@@ -50,7 +49,8 @@ FriendsDialog::FriendsDialog(const QString &accountName, const QString &friendId
     auto *incoming = new QGroupBox(tr("Incoming requests"), this);
     requests->setObjectName("incomingRequests");
     auto *accept = new QPushButton(tr("&Accept"), incoming);
-    auto *decline = new QPushButton(tr("&Decline"), incoming);
+    auto *decline = new QPushButton(tr("D&ecline"), incoming);
+    AppStyle::markSecondary(decline);
     accept->setEnabled(false);
     decline->setEnabled(false);
     auto *actions = new QHBoxLayout;
@@ -90,18 +90,12 @@ FriendsDialog::FriendsDialog(const QString &accountName, const QString &friendId
     acceptedLayout->addWidget(friends);
     acceptedLayout->addLayout(friendActions);
 
-    auto *reload = new QPushButton(tr("&Refresh"), this);
-    auto *close = new QPushButton(tr("Close"), this);
+    auto *reload = new QPushButton(tr("Refres&h"), this);
     auto *footer = new QHBoxLayout;
     footer->addWidget(reload);
     footer->addStretch();
-    footer->addWidget(close);
-    for (auto *button : {copy, send, accept, decline, remove, reload, close}) {
-        button->setAutoDefault(false);
-    }
 
     auto *layout = new QVBoxLayout(this);
-    layout->setContentsMargins(20, 20, 20, 20);
     layout->addLayout(form);
     layout->addWidget(status);
     layout->addWidget(incoming, 1);
@@ -113,8 +107,8 @@ FriendsDialog::FriendsDialog(const QString &accountName, const QString &friendId
         QApplication::clipboard()->setText(friendId);
         status->setText(tr("Friend ID copied."));
     });
-    connect(send, &QPushButton::clicked, this, &FriendsDialog::sendRequest);
-    connect(requestId, &QLineEdit::returnPressed, this, &FriendsDialog::sendRequest);
+    connect(send, &QPushButton::clicked, this, &FriendsPage::sendRequest);
+    connect(requestId, &QLineEdit::returnPressed, this, &FriendsPage::sendRequest);
     connect(requests, &QListWidget::itemSelectionChanged, this, [this, accept, decline] {
         const bool selected = !requests->selectedItems().isEmpty();
         accept->setEnabled(selected);
@@ -123,20 +117,24 @@ FriendsDialog::FriendsDialog(const QString &accountName, const QString &friendId
     connect(friends, &QTableWidget::itemSelectionChanged, this, [this, remove] {
         remove->setEnabled(!friends->selectedItems().isEmpty());
     });
-    connect(remove, &QPushButton::clicked, this, &FriendsDialog::removeFriend);
+    connect(remove, &QPushButton::clicked, this, &FriendsPage::removeFriend);
     connect(accept, &QPushButton::clicked, this, [this] { respond(true); });
     connect(decline, &QPushButton::clicked, this, [this] { respond(false); });
     connect(reload, &QPushButton::clicked, this, [this] {
         status->clear();
         refresh();
     });
-    connect(close, &QPushButton::clicked, this, &QDialog::reject);
 
     refresh();
     requestId->setFocus();
 }
 
-void FriendsDialog::refresh() {
+void FriendsPage::showEvent(QShowEvent *event) {
+    QWidget::showEvent(event);
+    refresh();
+}
+
+void FriendsPage::refresh() {
     LocalAccounts::Friends snapshot;
     const bool loaded = LocalAccounts::loadFriends(accountName, snapshot);
     requests->clear();
@@ -169,11 +167,12 @@ void FriendsDialog::refresh() {
     }
     noRequests->setVisible(loaded && snapshot.incoming.isEmpty());
     noSent->setVisible(loaded && snapshot.outgoing.isEmpty());
+    requests->setVisible(!snapshot.incoming.isEmpty());
     sent->setVisible(!snapshot.outgoing.isEmpty());
     noFriends->setVisible(loaded && snapshot.accepted.isEmpty());
 }
 
-void FriendsDialog::sendRequest() {
+void FriendsPage::sendRequest() {
     using LocalAccounts::Result;
     const QString id = requestId->text().trimmed();
     if (id.isEmpty()) {
@@ -208,7 +207,7 @@ void FriendsDialog::sendRequest() {
     }
 }
 
-void FriendsDialog::respond(bool accept) {
+void FriendsPage::respond(bool accept) {
     const auto selected = requests->selectedItems();
     if (selected.isEmpty()) {
         return;
@@ -227,7 +226,7 @@ void FriendsDialog::respond(bool accept) {
     }
 }
 
-void FriendsDialog::removeFriend() {
+void FriendsPage::removeFriend() {
     const auto selected = friends->selectedItems();
     if (selected.isEmpty()) {
         return;

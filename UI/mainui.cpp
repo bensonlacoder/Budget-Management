@@ -31,6 +31,8 @@ MainUI::MainUI(RealNumbersLoader loadRealNumbers, QWidget *parent)
     ui->setupUi(this);
     // A tinted notice, so the sandbox is never mistaken for the real numbers.
     ui->sandboxLabel->setStyleSheet(AppStyle::noticeBanner(this));
+    AppStyle::setTextRole(ui->titleLabel, "headline");
+    AppStyle::setTextRole(ui->balanceValueLabel, "balance");
     ui->amountSpinBox->installEventFilter(this);
     budgetPage = centralWidget();
 

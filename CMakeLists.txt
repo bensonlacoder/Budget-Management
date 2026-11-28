@@ -18,13 +18,13 @@ file(GLOB TEST_SOURCES CONFIGURE_DEPENDS tests/*.cpp)
 
 set(PURCHASE_SOURCES UI/purchasespage.cpp UI/purchasespage.h UI/scumenu.cpp UI/scumenu.h
     UI/lunchcatalog.cpp UI/localaccounts.cpp UI/localaccounts.h
-    UI/emailsender.cpp UI/emailsender.h UI/menusearchdialog.cpp UI/menusearchdialog.h
+    UI/emailsender.cpp UI/emailsender.h
     UI/appstyle.cpp UI/appstyle.h)
 
 # Main window and tab pages, shared by the app and the UI tests.
-set(PAGE_SOURCES UI/mainui.cpp UI/mainui.h UI/mainui.ui
+set(PAGE_SOURCES UI/mainui.cpp UI/mainui.h UI/mainui.ui UI/resources.qrc
     UI/authdialog.cpp UI/authdialog.h
-    UI/friendsdialog.cpp UI/friendsdialog.h
+    UI/friendspage.cpp UI/friendspage.h
     UI/planpage.cpp UI/planpage.h
     UI/chartspage.cpp UI/chartspage.h
     UI/profilepage.cpp UI/profilepage.h)
